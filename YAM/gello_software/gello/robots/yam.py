@@ -22,7 +22,7 @@ class YAMRobot(Robot):
     def __init__(self, channel="can0"):
         from i2rt.robots.get_robot import get_yam_robot
 
-        self.robot = get_yam_robot(channel=channel, arm_type=self._arm_type())
+        self.robot = get_yam_robot(channel=channel, arm_type=self._arm_type(), zero_gravity_mode=False)
         self._initialize_wrapper_state()
 
     def _initialize_wrapper_state(self) -> None:
@@ -79,6 +79,7 @@ class YAMRobot(Robot):
                     prepare_yam_robot,
                     channel,
                     arm_type=cls._arm_type(),
+                    zero_gravity_mode=False,
                     init_progress_callback=progress(side),
                 )
                 for side, channel in channels.items()
@@ -160,7 +161,7 @@ class YAMRobot(Robot):
                 print(f"{name.upper()} enabling motor {motor_id}/{total}", flush=True)
 
             return prepare_yam_robot(
-                channel, arm_type=cls._arm_type(), init_progress_callback=progress
+                channel, arm_type=cls._arm_type(), zero_gravity_mode=False, init_progress_callback=progress
             )
 
         with ThreadPoolExecutor(max_workers=len(channels), thread_name_prefix="yam_prepare") as pool:

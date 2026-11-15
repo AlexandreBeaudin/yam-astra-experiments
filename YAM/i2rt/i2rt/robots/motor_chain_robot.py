@@ -15,7 +15,10 @@ from i2rt.motor_drivers.dm_driver import (
     PassiveEncoderInfo,
 )
 from i2rt.robots.robot import Robot
-from i2rt.robots.utils import ArmType, GripperForceLimiter, GripperType, JointMapper, detect_gripper_limits
+from i2rt.robots.utils import (
+    JOINT_LIMIT_CHECK_BUFFER_RAD,
+    ArmType, GripperForceLimiter, GripperType, JointMapper, detect_gripper_limits,
+)
 from i2rt.utils.mujoco_utils import MuJoCoKDL
 
 
@@ -246,16 +249,16 @@ class MotorChainRobot(Robot):
         self._last_motor_torques: Optional[np.ndarray] = None
         self._stop_event = threading.Event()  # Add a stop event
         self._server_thread = threading.Thread(target=self.start_server, name="robot_server")
-        self._server_thread.start()
-
         if not zero_gravity_mode:
             # set current qpos as target pos with the default PD parameters
             self.command_joint_pos(self._joint_state.pos)
+        # The first update must use the intended hold, never zero PD commands.
+        self._server_thread.start()
 
     def __repr__(self) -> str:
         return f"MotorChainRobot(arm_type={self._arm_type}, gripper_type={self._gripper_type}, motor_chain={self.motor_chain})"
 
-    def _check_current_qpos_in_joint_limits(self, buffer_rad: float = 0.1) -> None:
+    def _check_current_qpos_in_joint_limits(self, buffer_rad: float = JOINT_LIMIT_CHECK_BUFFER_RAD) -> None:
         """Check if the self._joint_state is in the joint limits.
         If violated, raise an error.
         """

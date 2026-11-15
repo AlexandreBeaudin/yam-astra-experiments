@@ -12,13 +12,14 @@ class YAMProSelectionTest(unittest.TestCase):
     def test_single_arm_passes_pro_to_factory(self):
         with patch("i2rt.robots.get_robot.get_yam_robot") as factory:
             YAMRobot(channel="test_left")
-        factory.assert_called_once_with(channel="test_left", arm_type=ArmType.YAM_PRO)
+        factory.assert_called_once_with(channel="test_left", arm_type=ArmType.YAM_PRO, zero_gravity_mode=False)
 
     def _check_prepared_entry(self, entry):
         prepared = []
 
         def fake_prepare(channel, **kwargs):
             self.assertIs(kwargs["arm_type"], ArmType.YAM_PRO)
+            self.assertIs(kwargs["zero_gravity_mode"], False)
             robot = SimpleNamespace(
                 start_control=Mock(), build_robot=Mock(return_value=object()), rollback=Mock()
             )

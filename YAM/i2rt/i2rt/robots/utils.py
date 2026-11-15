@@ -19,6 +19,9 @@ _CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
 
 logger = logging.getLogger(__name__)
 
+# Existing MotorChainRobot initialization tolerance; shared with startup checks.
+JOINT_LIMIT_CHECK_BUFFER_RAD = 0.1
+
 
 # ---------------------------------------------------------------------------
 # Per-gripper hardware config — loaded from YAML at runtime.
@@ -679,6 +682,43 @@ class GripperForceLimiter:
             return gripper_state["target_qpos"]
 
 
+def hold_startup_position(motor_chain, kp, kd, joint_limits, *, gripper_index=None):
+    """Queue measured-position holding before a YAM control thread starts.
+
+    Does not home the arm or infer calibration. Invalid initial poses fail closed.
+    The gripper stays torque-free until its existing calibration/control takes over.
+    """
+    states = motor_chain.read_states()
+    pos = np.array([state.pos for state in states], dtype=float)
+    hold_kp = np.array(kp, dtype=float, copy=True)
+    hold_kd = np.array(kd, dtype=float, copy=True)
+    arm = np.arange(len(pos)) != gripper_index
+    limits = np.asarray(joint_limits, dtype=float)
+    if (
+        hold_kp.shape != pos.shape or hold_kd.shape != pos.shape
+        or limits.shape != (int(arm.sum()), 2)
+        or not all(np.all(np.isfinite(x)) for x in (pos, hold_kp, hold_kd, limits))
+        or np.any(hold_kp[arm] <= 0) or np.any(hold_kd[arm] < 0)
+        or np.any(limits[:, 0] >= limits[:, 1])
+    ):
+        raise ValueError('Invalid startup position-hold configuration')
+    if (np.any(pos[arm] < limits[:, 0] - JOINT_LIMIT_CHECK_BUFFER_RAD)
+            or np.any(pos[arm] > limits[:, 1] + JOINT_LIMIT_CHECK_BUFFER_RAD)):
+        raise RuntimeError(
+            f'Startup arm pose outside joint limits on {motor_chain.channel}: '
+            f'{pos[arm].tolist()}; review pose/calibration before enabling control'
+        )
+    if gripper_index is not None:
+        hold_kp[gripper_index] = hold_kd[gripper_index] = 0.0
+    motor_chain.set_commands(
+        torques=np.zeros(len(pos)), pos=pos, vel=np.zeros(len(pos)),
+        kp=hold_kp, kd=hold_kd,
+    )
+    logger.info('Startup position hold queued on %s: pos=%s kp=%s kd=%s',
+                motor_chain.channel, pos.tolist(), hold_kp.tolist(), hold_kd.tolist())
+    return pos
+
+
 def detect_gripper_limits(
     motor_chain: DMChainCanInterface,
     gripper_index: int,
@@ -686,6 +726,7 @@ def detect_gripper_limits(
     max_duration: float = 2.0,
     position_threshold: float = 0.01,
     check_interval: float = 0.1,
+    max_arm_drift_rad: float = 0.05,
 ) -> Tuple[float, float]:
     """
     Detect gripper limits by applying test torques and monitoring position changes.
@@ -702,54 +743,80 @@ def detect_gripper_limits(
         List of detected limits [limit1, limit2]
     """
     logger = logging.getLogger(__name__)
-    positions = []
     num_motors = len(motor_chain.motor_list)
-    zero_torques = np.zeros(num_motors)
+    if not 0 <= gripper_index < num_motors:
+        raise ValueError('Invalid gripper index')
+    if not np.isfinite(max_arm_drift_rad) or max_arm_drift_rad <= 0:
+        raise ValueError('Invalid calibration arm-drift limit')
+    with motor_chain.command_lock:
+        saved = deepcopy(motor_chain.commands)
+    if len(saved) != num_motors:
+        raise RuntimeError('Missing startup hold commands before gripper calibration')
+    hold_pos = np.array([cmd.pos for cmd in saved])
+    hold_vel = np.array([cmd.vel for cmd in saved])
+    hold_kp = np.array([cmd.kp for cmd in saved])
+    hold_kd = np.array([cmd.kd for cmd in saved])
+    hold_torque = np.array([cmd.torque for cmd in saved])
+    arm = np.arange(num_motors) != gripper_index
+    if (not all(np.all(np.isfinite(x)) for x in
+                (hold_pos, hold_vel, hold_kp, hold_kd, hold_torque))
+            or np.any(hold_kp[arm] <= 0) or np.any(hold_kd[arm] < 0)):
+        raise RuntimeError('Arm position hold is required before gripper calibration')
 
-    # Get motor direction for the gripper
+    def checked_states():
+        states = motor_chain.read_states()
+        measured = np.array([state.pos for state in states])
+        if measured.shape != hold_pos.shape or not np.all(np.isfinite(measured)):
+            raise RuntimeError('Invalid feedback during gripper calibration')
+        delta = measured[arm] - hold_pos[arm]
+        if np.any(np.abs(delta) > max_arm_drift_rad):
+            raise RuntimeError(
+                f'Arm moved during gripper calibration on {motor_chain.channel}: '
+                f'delta_rad={delta.tolist()}, limit={max_arm_drift_rad}'
+            )
+        return states
+
+    def command(torques, kp, kd):
+        motor_chain.set_commands(torques=torques, pos=hold_pos, vel=hold_vel,
+                                 kp=kp, kd=kd)
+
     motor_direction = motor_chain.motor_direction[gripper_index]
-
-    # Record initial position
-    initial_states = motor_chain.read_states()
-    init_torque = np.array([state.eff for state in initial_states])
-    initial_pos = initial_states[gripper_index].pos
-    positions.append(initial_pos)
-    logger.info(f"Gripper calibration starting from position: {initial_pos:.4f}")
-
-    # Test both directions
-    for direction in [1, -1]:
-        logger.info(f"Testing gripper direction: {direction}")
-        test_torques = init_torque
-        test_torques[gripper_index] = direction * test_torque
-
-        start_time = time.time()
-        last_pos = None
-        position_stable_count = 0
-
-        while time.time() - start_time < max_duration:
-            motor_chain.set_commands(torques=test_torques)
-            time.sleep(check_interval)
-
-            states = motor_chain.read_states()
-            current_pos = states[gripper_index].pos
-            positions.append(current_pos)
-
-            # Check if position has stopped changing (gripper hit limit)
-            if last_pos is not None:
-                pos_change = abs(current_pos - last_pos)
-                if pos_change < position_threshold:
-                    position_stable_count += 1
-                else:
-                    position_stable_count = 0
-
-                # Check if gripper has hit limit (position stable)
-                if position_stable_count >= 3:
-                    logger.info(f"Gripper limit detected: pos={current_pos:.4f}")
-                    break
-
-            last_pos = current_pos
-
-        time.sleep(0.3)
+    initial_pos = checked_states()[gripper_index].pos
+    positions = [initial_pos]
+    logger.info('Gripper calibration on %s: start=%s arm_hold=%s drift_limit=%s',
+                motor_chain.channel, initial_pos, hold_pos[arm].tolist(), max_arm_drift_rad)
+    calibration_kp = hold_kp.copy()
+    calibration_kd = hold_kd.copy()
+    calibration_kp[gripper_index] = calibration_kd[gripper_index] = 0.0
+    try:
+        for direction in [1, -1]:
+            logger.info(f'Testing gripper direction: {direction}')
+            test_torques = hold_torque.copy()
+            test_torques[gripper_index] = direction * test_torque
+            start_time = time.monotonic()
+            last_pos = None
+            position_stable_count = 0
+            while time.monotonic() - start_time < max_duration:
+                checked_states()
+                command(test_torques, calibration_kp, calibration_kd)
+                time.sleep(check_interval)
+                current_pos = checked_states()[gripper_index].pos
+                positions.append(current_pos)
+                if last_pos is not None:
+                    if abs(current_pos - last_pos) < position_threshold:
+                        position_stable_count += 1
+                    else:
+                        position_stable_count = 0
+                    if position_stable_count >= 3:
+                        logger.info(f'Gripper limit detected: pos={current_pos:.4f}')
+                        break
+                last_pos = current_pos
+            time.sleep(0.3)
+            checked_states()
+    finally:
+        # Remove calibration torque even on an exception. The caller rolls back
+        # hardware initialization if calibration fails; never recapture a drifted pose.
+        command(hold_torque, hold_kp, hold_kd)
 
     # Calculate detected limits
     min_pos = min(positions)

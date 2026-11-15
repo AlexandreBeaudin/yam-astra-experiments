@@ -20,6 +20,7 @@ from i2rt.robots.utils import (
     GripperType,
     _load_arm_config,
     combine_arm_and_gripper_xml,
+    hold_startup_position,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,17 +33,37 @@ class PreparedYAMRobot:
     motor_chain: DMChainCanInterface
     robot_factory: Callable[[], Robot]
     channel: str
+    startup_arm_position: Optional[np.ndarray] = None
+    max_startup_drift_rad: float = 0.05
     _control_started: bool = False
     _robot: Optional[Robot] = None
     _rolled_back: bool = False
+
+    def _check_startup_pose(self, phase: str) -> None:
+        if self.startup_arm_position is None:
+            return
+        states = self.motor_chain.read_states()
+        measured = np.array([state.pos for state in states[:len(self.startup_arm_position)]])
+        delta = measured - self.startup_arm_position
+        logging.info('Startup pose check on %s (%s): pos=%s delta_rad=%s',
+                     self.channel, phase, measured.tolist(), delta.tolist())
+        if not np.all(np.isfinite(measured)) or np.any(np.abs(delta) > self.max_startup_drift_rad):
+            raise RuntimeError(f'Arm moved during startup on {self.channel} ({phase}): '
+                               f'delta_rad={delta.tolist()}, limit={self.max_startup_drift_rad}')
 
     def start_control(self) -> None:
         if self._rolled_back:
             raise RuntimeError(f"Cannot start rolled-back YAM on {self.channel}")
         if self._control_started:
             return
-        self.motor_chain.start_thread()
-        self._control_started = True
+        try:
+            self._check_startup_pose('before control thread')
+            self.motor_chain.start_thread()
+            self._control_started = True
+            self._check_startup_pose('after control thread')
+        except Exception:
+            self.rollback()
+            raise
         logging.info("YAM control thread started on %s", self.channel)
 
     def build_robot(self) -> Robot:
@@ -51,6 +72,7 @@ class PreparedYAMRobot:
         self.start_control()
         try:
             self._robot = self.robot_factory()
+            self._check_startup_pose('after robot construction')
         except Exception:
             self.rollback()
             raise
@@ -347,6 +369,17 @@ def get_yam_robot(
 
     logging.info(f"adjusted motor_offsets: {motor_chain.motor_offset.tolist()}")
 
+    # Install position-hold commands BEFORE either deferred control thread starts.
+    # Gripper calibration must not leave the arm joints in torque-only mode.
+    try:
+        startup_position = hold_startup_position(
+            motor_chain, kp, kd, joint_limits,
+            gripper_index=n_arm_joints if with_gripper else None,
+        )
+    except Exception:
+        motor_chain.rollback_initialization()
+        raise
+
     get_robot = partial(
         MotorChainRobot,
         motor_chain=motor_chain,
@@ -381,6 +414,7 @@ def get_yam_robot(
         motor_chain=motor_chain,
         robot_factory=robot_factory,
         channel=channel,
+        startup_arm_position=startup_position[:n_arm_joints].copy(),
     )
     if defer_start:
         return prepared
