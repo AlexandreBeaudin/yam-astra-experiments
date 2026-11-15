@@ -747,7 +747,7 @@
     "YAM/i2rt/examples/single_motor_position_pd_control/single_motor_position_pd_control.py": "3877fa736404ed51a6af42d93b823a75fdbf7b25644480507707ee05a60b5b30",
     "YAM/i2rt/examples/control_with_mujoco/control_with_mujoco.py": "f524d6020134e57dad562a6bde2aa95db428499c1c48fd9da6faac249d928762",
     "YAM/i2rt/examples/control_with_mujoco/README.md": "4a086c6c1cced00be23262d77496f13245257e6b4953956c8f07235e25d948cf",
-    "lab-transfer/README.md": "f766a3f720f3557855cf2b1ee9a3e209fd234ecc04e94391073c3b15f4bf48c3",
+    "lab-transfer/README.md": "3ca0aa6173f3be060d9dc12b1f90de48184fc4fef0634b8964d353dec825c1a5",
     "lab-transfer/prepare_source.py": "08fb10c145c522c80970f15cc35d3a4ee3dda8a6d7ad8f36a6c937a37b13ac54",
     "lab-transfer/configure_local_station.py": "1ec48dd0f52b8c42cc4848407548b8392ceda02589c5ecaf71b3268c5de9084f",
     "lab-transfer/test_transfer.py": "72df920d41efaca759d5ae08ddbb2fef9af71a9701c2763f4f00f17447686af2",

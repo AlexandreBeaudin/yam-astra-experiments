@@ -1,8 +1,8 @@
 # Share Astra experiments with another YAM station
 
-Use Bash for all commands below (`bash` starts a Bash shell if your terminal uses fish).
+All command blocks below use fish. Stay in your fish terminal; no Bash switch is needed.
 Run these on the computer identified by each step. The prepared source snapshot is
-`~/workspace/yam-astra-shared` on the current machine. Nothing has been uploaded.
+`~/workspace/jiaxin/yam-astra-shared` on the current machine. Preparing the snapshot itself does not upload anything.
 
 ## 1. What is being transferred
 
@@ -44,9 +44,10 @@ this procedure does not assume that YAM3's gains or calibration suit other hardw
 GitHub CLI login works from **any folder**. It authenticates this Linux user on
 this computer. Git author name/email are separate from GitHub authentication.
 
-```bash
-bash
-command -v gh || { sudo apt-get update && sudo apt-get install -y gh; }
+```fish
+if not command -q gh
+    sudo apt-get update; and sudo apt-get install -y gh
+end
 gh auth login --hostname github.com --git-protocol https --web
 gh auth setup-git
 gh auth status
@@ -63,11 +64,11 @@ or log out after use; do not leave your personal credentials for teammates.
 The snapshot has already been prepared. Use that folder, **not** the original
 `/home/rhos/workspace/jiaxin/shurui` experiment directory:
 
-```bash
-cd ~/workspace/yam-astra-shared
+```fish
+cd ~/workspace/jiaxin/yam-astra-shared
 git init -b main
-read -r -p 'Your Git commit display name: ' AUTHOR_NAME
-read -r -p 'Your Git commit email (or GitHub noreply email): ' AUTHOR_EMAIL
+read -P 'Your Git commit display name: ' AUTHOR_NAME
+read -P 'Your Git commit email (or GitHub noreply email): ' AUTHOR_EMAIL
 git config user.name "$AUTHOR_NAME"
 git config user.email "$AUTHOR_EMAIL"
 python3 lab-transfer/stage_source.py
@@ -79,9 +80,9 @@ Review the file list before the first upload. It should contain source and local
 font/model assets, not `.venv`, experiment images, logs, MP4s or credentials.
 Then:
 
-```bash
+```fish
 git commit -m "Snapshot working YAM Astra runner, V3 prompt and replay exporter"
-GH_OWNER=$(gh api user --jq .login)
+set GH_OWNER (gh api user --jq .login)
 gh repo create "$GH_OWNER/yam-astra-experiments" --private --source=. --remote=origin --push
 gh repo view --web
 ```
@@ -94,9 +95,9 @@ replace the owner/name in the commands with your authorized organization/repo.
 
 To regenerate a snapshot later, choose a **new** output folder:
 
-```bash
+```fish
 python3 /home/rhos/workspace/jiaxin/shurui/lab-transfer/prepare_source.py \
-  --out "$HOME/workspace/yam-astra-shared-next"
+  --out "$HOME/workspace/jiaxin/yam-astra-shared-next"
 ```
 
 The helper refuses to overwrite an existing directory. Work in the shared Git
@@ -105,19 +106,19 @@ magically appear in GitHub.
 
 ## 4. Clone — second YAM computer
 
-Log into the second computer locally, or SSH using its actual lab address:
+Log into the second computer locally, or SSH using its actual lab address.
+After connecting, run `fish` if its default shell is different:
 
-```bash
+```fish
 ssh TEAMMATE_LINUX_USER@SECOND_YAM_HOST_OR_IP
-bash
 sudo apt-get update
 sudo apt-get install -y git gh curl ffmpeg build-essential
 
 gh auth login --hostname github.com --git-protocol https --web
 gh auth setup-git
 gh auth status
-mkdir -p ~/workspace
-cd ~/workspace
+mkdir -p ~/workspace/jiaxin
+cd ~/workspace/jiaxin
 gh repo clone OWNER/yam-astra-experiments yam-astra-shared
 cd yam-astra-shared
 git switch -c experiments/second-yam-task
@@ -129,7 +130,7 @@ invite. HTTPS through `gh` does not require creating or copying SSH private keys
 
 Set their Git commit identity once in this repository:
 
-```bash
+```fish
 git config user.name 'TEAMMATE NAME'
 git config user.email 'TEAMMATE GITHUB EMAIL'
 ```
@@ -140,10 +141,13 @@ Use Python 3.11 as specified by the checked-in projects. Do not copy the origina
 `.venv`: it contains machine/path-specific interpreter links and editable installs.
 Install uv if missing using its official installer, then sync the checked-in lock:
 
-```bash
-command -v uv || { curl -LsSf https://astral.sh/uv/install.sh -o /tmp/install-uv.sh && sh /tmp/install-uv.sh; }
-export PATH="$HOME/.local/bin:$PATH"
-cd ~/workspace/yam-astra-shared/YAM/gello_software
+```fish
+if not command -q uv
+    curl -LsSf https://astral.sh/uv/install.sh -o /tmp/install-uv.sh
+    and sh /tmp/install-uv.sh
+end
+fish_add_path "$HOME/.local/bin"
+cd ~/workspace/jiaxin/yam-astra-shared/YAM/gello_software
 uv python install 3.11
 uv sync --frozen --extra yam --extra realsense --extra mcap
 cd ../..
@@ -158,7 +162,7 @@ Playwright since it is an extra manual install; re-run its install afterwards.
 
 Offline checks, before configuring or starting hardware:
 
-```bash
+```fish
 YAM/gello_software/.venv/bin/python -m py_compile \
   integrations/inspect_robots/astra_run.py \
   integrations/inspect_robots/export_replay_mp4.py
@@ -179,7 +183,7 @@ Do **not** rename the second computer to `rhos-nuc-1` or remove the hostname gua
 
 Find the second station's existing profile (read-only):
 
-```bash
+```fish
 hostname -s
 ls -l ~/.config/yam/profiles/
 ls -l ~/.config/yam/setup/
@@ -194,18 +198,18 @@ alone does not establish which physical follower is connected.
 
 After the lab owner verifies that profile and the physical arm mapping:
 
-```bash
-cd ~/workspace/yam-astra-shared
-read -r -e -p 'Absolute path to THIS station profile: ' STATION_PROFILE
+```fish
+cd ~/workspace/jiaxin/yam-astra-shared
+read -P 'Absolute path to THIS station profile: ' STATION_PROFILE
 YAM/gello_software/.venv/bin/python lab-transfer/configure_local_station.py \
-  --profile "$STATION_PROFILE" --expected-host "$(hostname -s | tr '[:upper:]' '[:lower:]')"
+  --profile "$STATION_PROFILE" --expected-host (hostname -s | string lower)
 ```
 
 Review the printed paths/channels, then apply:
 
-```bash
+```fish
 YAM/gello_software/.venv/bin/python lab-transfer/configure_local_station.py \
-  --profile "$STATION_PROFILE" --expected-host "$(hostname -s | tr '[:upper:]' '[:lower:]')" --apply
+  --profile "$STATION_PROFILE" --expected-host (hostname -s | string lower) --apply
 YAM/gello_software/.venv/bin/python integrations/inspect_robots/astra_run.py --attempt 1
 ```
 
@@ -235,35 +239,35 @@ Terminal A, only when no other hardware owner is running: the following command
 **initializes/enables both followers** and may initialize/calibrate grippers. Use
 the lab's normal physical support and supervised startup procedure.
 
-```bash
-cd ~/workspace/yam-astra-shared
-export PYTHONPATH="$PWD/YAM/gello_software:$PWD/YAM/i2rt"
-YAM/gello_software/.venv/bin/python -u - <<'PY'
+```fish
+cd ~/workspace/jiaxin/yam-astra-shared
+set -gx PYTHONPATH "$PWD/YAM/gello_software:$PWD/YAM/i2rt"
+YAM/gello_software/.venv/bin/python -u -c '
 import os, sys, yaml
 from pathlib import Path
-p=yaml.safe_load(Path('profiles/shurui-mcap.yaml').read_text())
-os.execv(sys.executable,[sys.executable,'-u','-m','experiments.yam_safety_daemon',
-    '--left-config-path',p['arms']['left'],
-    '--right-config-path',p['arms']['right'],
-    '--hardware-port',str(p['network']['hardware_port']),
-    '--safety-port',str(p['network']['safety_port'])])
-PY
+p = yaml.safe_load(Path("profiles/shurui-mcap.yaml").read_text())
+os.execv(sys.executable, [sys.executable, "-u", "-m", "experiments.yam_safety_daemon",
+    "--left-config-path", p["arms"]["left"],
+    "--right-config-path", p["arms"]["right"],
+    "--hardware-port", str(p["network"]["hardware_port"]),
+    "--safety-port", str(p["network"]["safety_port"])])
+'
 ```
 
 Leave it open and wait for confirmed SAFE_HOLD. Terminal B, only if no camera
 service already owns these cameras:
 
-```bash
-cd ~/workspace/yam-astra-shared
-export PYTHONPATH="$PWD/YAM/gello_software:$PWD/YAM/i2rt"
+```fish
+cd ~/workspace/jiaxin/yam-astra-shared
+set -gx PYTHONPATH "$PWD/YAM/gello_software:$PWD/YAM/i2rt"
 YAM/gello_software/.venv/bin/python -u preview_cameras.py
 ```
 
 Open `http://127.0.0.1:8765/` on the second computer and verify the physical views
 and live updates. Terminal C:
 
-```bash
-cd ~/workspace/yam-astra-shared
+```fish
+cd ~/workspace/jiaxin/yam-astra-shared
 YAM/gello_software/.venv/bin/python integrations/inspect_robots/astra_run.py --check-station --attempt 1
 ```
 
@@ -276,7 +280,7 @@ there is no need to point either runner at the other's IP address.
 
 For a different task, edit **both** the prompt and the scene instruction:
 
-```bash
+```fish
 nano integrations/inspect_robots/astra_exploration.txt
 nano integrations/inspect_robots/astra_run.py
 ```
@@ -289,10 +293,10 @@ same YAM3 right-arm/gripper arrangement and are not calibration for other hardwa
 
 In the SAME Terminal C that will run the experiment:
 
-```bash
-read -r -s -p 'RHOS API key: ' RHOS_API_KEY
+```fish
+read -s -P 'RHOS API key: ' RHOS_API_KEY
 echo
-export RHOS_API_KEY
+set -gx RHOS_API_KEY "$RHOS_API_KEY"
 YAM/gello_software/.venv/bin/python integrations/inspect_robots/astra_run.py --attempt 1
 YAM/gello_software/.venv/bin/python -u integrations/inspect_robots/astra_run.py \
   --run --attempt 1 --right-channel-confirmed can_yam_a
@@ -306,7 +310,7 @@ station/task label in your notes and shared results to avoid ambiguity.
 
 Export an episode after it finishes:
 
-```bash
+```fish
 YAM/gello_software/.venv/bin/python integrations/inspect_robots/export_replay_mp4.py \
   --run-dir integrations/inspect_robots/astra-yam3-run-001 --speed 4 --fps 30 \
   --title 'Your experiment task'
@@ -318,7 +322,7 @@ Keep each experiment on a separate branch, e.g. `experiments/yam3-pick-place` an
 `experiments/second-yam-task`. Stop experiments before updating the source used by
 a running daemon: source edits can invalidate its fingerprint.
 
-```bash
+```fish
 git status
 git add integrations/inspect_robots/astra_exploration.txt integrations/inspect_robots/astra_run.py
 git commit -m "Configure second station and task"
@@ -330,7 +334,7 @@ station's branch. Local `profiles/*.yaml` remain ignored. Share common exporter 
 prompt improvements via reviewed PRs or cherry-picks, keeping station identity
 changes separate from common changes. To update an existing clean branch:
 
-```bash
+```fish
 git pull --ff-only
 ```
 
@@ -343,7 +347,7 @@ for that source path; do not move or replace the running station's code mid-run.
 Use SSH/rsync for images and videos, not ordinary Git commits. From the original
 computer, replace the remote login and hostname first:
 
-```bash
+```fish
 rsync -av --progress \
   /home/rhos/workspace/jiaxin/shurui/integrations/inspect_robots/astra-yam3-run-013/ \
   TEAMMATE_LINUX_USER@SECOND_YAM_HOST_OR_IP:~/yam3-run-013-reference/
@@ -353,7 +357,7 @@ This is reference evidence, not a destination robot checkpoint. For an HTML view
 copy the whole run directory (including `replay-frames/` and `replay_assets/`);
 `replay.html` alone does not contain its JPEG files. For just the finished video:
 
-```bash
+```fish
 scp /home/rhos/workspace/jiaxin/shurui/integrations/inspect_robots/astra-yam3-run-013/replay_4x.mp4 \
   TEAMMATE_LINUX_USER@SECOND_YAM_HOST_OR_IP:~/
 ```
