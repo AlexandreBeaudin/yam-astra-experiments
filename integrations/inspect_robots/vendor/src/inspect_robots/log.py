@@ -1,0 +1,278 @@
+"""The immutable evaluation log — Inspect Robots's reproducible record of a run.
+
+Mirrors Inspect AI's ``EvalLog``: ``version`` + ``status`` + ``eval`` spec +
+``results`` + ``stats`` + per-scene ``samples`` + ``error``. Serialized to JSON
+with a schema version so newer Inspect Robots always reads older logs (a read-back
+guarantee enforced by golden tests in a later step).
+
+Immutability is *shallow*: the dataclasses are frozen and sequence fields are
+tuples, so reassigning a field or mutating the sample list is impossible — but
+dict-valued fields (``SceneResult.reduced``, the per-epoch score dicts,
+``EvalResults.metrics``, ``EvalSpec.policy_config`` / ``embodiment_info`` /
+``grader_config``, and ``SceneResult.scene_metadata``)
+remain plain mutable dicts, as do the dictionaries inside
+``SceneResult.operator_messages`` and ``SceneResult.events``.
+``SceneResult.policy_transcripts`` entries
+are arbitrary mutable JSON values. Treat a log as read-only; nothing
+deep-freezes it.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, ClassVar
+
+import numpy as np
+
+
+def _numpy_scalar_to_python(value: object) -> object:
+    # By kind, as json_log._sanitize does: .item() would turn ns datetimes into bare ints.
+    if isinstance(value, np.bool_):
+        return bool(value)
+    # Kind "i"/"u" only: timedelta64 subclasses np.integer but int() would drop its unit.
+    if isinstance(value, np.integer) and value.dtype.kind in "iu":
+        return int(value)
+    if isinstance(value, np.floating):
+        return float(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+def _json_safe_scene_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    """Deep-copy each JSON-encodable value (NumPy numbers as Python ones); omit the rest."""
+    safe: dict[str, Any] = {}
+    for key, value in metadata.items():
+        try:
+            safe[key] = json.loads(json.dumps(value, default=_numpy_scalar_to_python))
+        except (TypeError, ValueError, OverflowError):
+            continue
+    return safe
+
+
+# Version 2 (the paper release) adds rubrics (EvalSpec.rubrics, SceneResult.rubrics)
+# and the policy's stated termination detail (SceneResult.termination_details).
+# Version 3 gives every trial a record: SceneResult.record_ids and record_dirs name
+# each trial's record directory (EvalStats.records_dir), and SceneResult.events
+# keeps each trial's full event transcript, including the policy_terminal event.
+# EvalSpec.reducer records the epoch reducer so a log can be re-scored, and
+# EvalSpec.benchmark names the benchmark (and version) a task ran in.
+# Older logs still read: their new fields are empty and their result keys,
+# which were scorer names in version 1, are unchanged.
+SCHEMA_VERSION = 3
+READABLE_SCHEMA_VERSIONS = frozenset({1, 2, SCHEMA_VERSION})
+
+
+@dataclass(frozen=True)
+class EvalSpec:
+    """Top-level identity and configured horizon of a reproducible eval.
+
+    ``max_steps`` is always the resolved integer budget used by the rollout.
+    ``max_seconds`` preserves a benchmark's declared physical-time budget when
+    that integer was derived from the embodiment's control rate.
+
+    The three optional provenance fields record what simulator build, asset
+    revision, and policy checkpoint were used, so a published number can be
+    re-derived months later even if the sim, scene assets, or policy have moved:
+
+    - ``environment_id``: simulator or hardware-rig identifier (e.g. ``"isaacsim-2026.1.0"``).
+    - ``environment_revision``: hash or tag of the scene/asset bundle (e.g. a git SHA).
+    - ``policy_checkpoint``: hash, path, or Hugging Face revision of the model checkpoint.
+    """
+
+    task: str
+    policy: str
+    embodiment: str
+    created: str
+    inspect_robots_version: str
+    git_commit: str | None = None
+    policy_config: dict[str, Any] = field(default_factory=dict)
+    embodiment_info: dict[str, Any] = field(default_factory=dict)
+    seed: int | None = None
+    max_steps: int | None = None
+    max_seconds: float | None = None
+    # Environment and checkpoint provenance (plan 0053).
+    environment_id: str | None = None
+    environment_revision: str | None = None
+    policy_checkpoint: str | None = None
+    # Appended after ``policy_checkpoint`` so the positional order of every field
+    # that predates them is preserved.
+    # The run's grader by registry name ("operator", "vlm", a plugin's own
+    # name), ``None`` when the run graded nothing. A log written before this
+    # field existed also reads back as ``None``.
+    grader: str | None = None
+    # What actually governed grading, as reported by the grader's optional
+    # ``config`` hook; ``{}`` for a grader that exposes none. Credentials are
+    # never recorded. For the builtin ``vlm`` grader these are resolved
+    # values, not the caller's inputs: the rubric has its default substituted
+    # and any ``rubric_file`` already read, and ``effort`` is the value that
+    # rides each request (``None`` omits ``reasoning_effort`` so the provider
+    # default applies, ``"none"`` asks for the minimum). Its ``rubric`` is the
+    # run-level fallback only — a scene carrying its own
+    # ``metadata["rubric"]`` overrides it for that scene, and that value is
+    # already persisted in ``SceneResult.scene_metadata``.
+    grader_config: dict[str, Any] = field(default_factory=dict)
+    # The task's rubrics (name, kind, text, scorer, metadata), in declared order;
+    # a scene's own additions and overrides are in its SceneResult.rubrics.
+    # Empty in schema-1 logs.
+    rubrics: list[dict[str, Any]] = field(default_factory=list)
+    # The epoch reducer that combined each scene's trial scores ("mean" by
+    # default), so a log can be re-scored after the fact. None before schema 3.
+    reducer: str | None = None
+    # The benchmark this task ran as part of, {"name", "version"}, or None.
+    benchmark: dict[str, str] | None = None
+
+
+@dataclass(frozen=True)
+class EvalStats:
+    """Timing and execution statistics for a run."""
+
+    started_at: str
+    completed_at: str
+    duration_s: float
+    total_steps: int
+    mean_inference_latency_s: float | None = None
+    # Directory of streamed camera frame side-cars, if frame logging was enabled.
+    frames_dir: str | None = None
+    # Directory of per-trial record directories, if record storage was enabled.
+    records_dir: str | None = None
+
+
+@dataclass(frozen=True)
+class SceneResult:
+    """Persist one scene's metadata, reduced scores, and raw per-epoch records."""
+
+    scene_id: str
+    status: str  # "success" | "error" | "cancelled"
+    reduced: dict[str, float | None] = field(default_factory=dict)
+    epochs: tuple[dict[str, float | None], ...] = ()
+    error: str | None = None
+    # What the scene asked the policy to do — makes a log self-describing.
+    instruction: str | None = None
+    # JSON-safe scene metadata, copied per key so one adapter-owned object does
+    # not prevent the rest of the scene contract from being persisted.
+    scene_metadata: dict[str, Any] = field(default_factory=dict)
+    # Strictly parallel to ``epochs``: the operator's verdict per recorded
+    # trial, ``None`` when the trial errored or no judgement was captured.
+    # Defaults keep logs written before these fields existed readable.
+    operator_judgements: tuple[str | None, ...] = ()
+    # Strictly parallel to ``epochs``: which path produced each recorded
+    # operator judgement ("console", "prompt", "embodiment", "vlm"), ``None``
+    # when the trial has no judgement (errored trials, no grader, a skipped
+    # prompt) or the grader recorded one without an operator event. The default
+    # keeps older logs readable.
+    judgement_sources: tuple[str | None, ...] = ()
+    # Strictly parallel to ``epochs``: qualitative operator context per trial,
+    # ``None`` when no note was captured. Read by nothing that scores.
+    operator_notes: tuple[str | None, ...] = ()
+    # Strictly parallel to ``epochs``: live feedback drained during each trial.
+    # Both sequence layers are tuples to preserve the log's shallow immutability.
+    operator_messages: tuple[tuple[dict[str, Any], ...], ...] = ()
+    # Strictly parallel to ``epochs``: trial-specific metadata from the policy.
+    trial_metadata: tuple[dict[str, Any], ...] = ()
+    # Strictly parallel to ``epochs``: why each recorded trial ended, or
+    # ``None`` for errored trials. The default keeps older schema-v1 logs readable.
+    termination_reasons: tuple[str | None, ...] = ()
+    # Strictly parallel to ``epochs``: the policy's stated reason when its
+    # terminal action (done, give_up, ...) ended the trial, else ``None``.
+    termination_details: tuple[str | None, ...] = ()
+    # The scene's effective rubrics (name, kind, text, scorer, metadata), the
+    # task's merged with the scene's own; results are keyed by these names.
+    # Empty in schema-1 logs, whose result keys are scorer names.
+    rubrics: tuple[dict[str, Any], ...] = ()
+    # Strictly parallel to ``epochs``: the policy's audit record per trial,
+    # ``None`` when unavailable. The default keeps older schema-v1 logs readable.
+    policy_transcripts: tuple[Any, ...] = ()
+    # Strictly parallel to ``epochs``: each trial's ``Record.record_id``.
+    record_ids: tuple[str | None, ...] = ()
+    # Strictly parallel to ``epochs``: each trial's record directory relative to
+    # the log directory (``record.json`` and ``chunks.jsonl``), or None when
+    # record storage was disabled or failed.
+    record_dirs: tuple[str | None, ...] = ()
+    # Strictly parallel to ``epochs``: each trial's event transcript, as
+    # ``{"kind", "t", "data"}`` dictionaries in the order they happened.
+    events: tuple[tuple[dict[str, Any], ...], ...] = ()
+
+
+@dataclass(frozen=True)
+class EvalResults:
+    """Aggregate results across all scenes."""
+
+    total_scenes: int
+    total_trials: int
+    metrics: dict[str, float | None] = field(default_factory=dict)
+    # Errored trials, which are recorded but never scored (visible per-scene
+    # as empty entries in ``SceneResult.epochs``). The default keeps logs
+    # written before this field existed readable.
+    errored_trials: int = 0
+    # Per scorer, how many trials it abstained on (``Score(value=None)``).
+    # Metrics average only judged trials, so this is the other half of the
+    # denominator. Scorers that never abstained are omitted.
+    abstentions: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class EvalLog:
+    """The full record returned by [`eval`][inspect_robots.eval.eval] and persisted to disk."""
+
+    version: int
+    status: str  # "started" | "success" | "error" | "cancelled"
+    eval: EvalSpec
+    results: EvalResults
+    stats: EvalStats
+    samples: tuple[SceneResult, ...] = ()
+    error: str | None = None
+
+    SCHEMA_VERSION: ClassVar[int] = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert the complete log to nested dictionaries and sequences."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EvalLog:
+        """Reconstruct an immutable log, rejecting unsupported schema versions."""
+        if data.get("version") not in READABLE_SCHEMA_VERSIONS:
+            raise ValueError(
+                f"unsupported eval-log schema version {data.get('version')!r}; "
+                f"this Inspect Robots reads versions {sorted(READABLE_SCHEMA_VERSIONS)}"
+            )
+        samples = []
+        for raw in data.get("samples", ()):
+            sample = dict(raw)
+            # JSON has no tuple type: coerce the sequence fields it deserializes
+            # as lists back into tuples so a read-back log is genuinely immutable
+            # too, not just one freshly returned by eval(). ``.get`` covers a log
+            # written before ``operator_judgements`` existed (newer reads older).
+            sample["epochs"] = tuple(sample.get("epochs", ()))
+            sample["operator_judgements"] = tuple(sample.get("operator_judgements", ()))
+            sample["judgement_sources"] = tuple(sample.get("judgement_sources", ()))
+            sample["operator_notes"] = tuple(sample.get("operator_notes", ()))
+            sample["operator_messages"] = tuple(
+                tuple(messages) for messages in sample.get("operator_messages", ())
+            )
+            sample["trial_metadata"] = tuple(sample.get("trial_metadata", ()))
+            sample["termination_reasons"] = tuple(sample.get("termination_reasons", ()))
+            sample["termination_details"] = tuple(sample.get("termination_details", ()))
+            sample["rubrics"] = tuple(sample.get("rubrics", ()))
+            sample["policy_transcripts"] = tuple(sample.get("policy_transcripts", ()))
+            sample["record_ids"] = tuple(sample.get("record_ids", ()))
+            sample["record_dirs"] = tuple(sample.get("record_dirs", ()))
+            sample["events"] = tuple(tuple(trial) for trial in sample.get("events", ()))
+            samples.append(SceneResult(**sample))
+        return cls(
+            version=data["version"],
+            status=data["status"],
+            eval=EvalSpec(**data["eval"]),
+            results=EvalResults(**data["results"]),
+            stats=EvalStats(**data["stats"]),
+            samples=tuple(samples),
+            error=data.get("error"),
+        )
+
+
+def read_eval_log(path: str) -> EvalLog:
+    """Read an [`EvalLog`][inspect_robots.log.EvalLog] back from a JSON file on disk."""
+    with Path(path).open(encoding="utf-8") as fh:
+        return EvalLog.from_dict(json.load(fh))

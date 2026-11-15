@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "real2sim-workbench"
+version = "0.1.0"
+description = "Platform-neutral real2sim planning and interface scaffold"
+requires-python = ">=3.8"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.optional-dependencies]
+manager = ["Pillow>=10", "mcap>=1.2", "av>=12"]
+bos = ["bce-python-sdk==0.9.79"]

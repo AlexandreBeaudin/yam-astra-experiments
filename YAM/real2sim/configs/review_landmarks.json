@@ -1,0 +1,12 @@
+{
+  "kind": "sparse manual approximate cup-rim centres",
+  "uncertainty_px": 10,
+  "note": "Frames differ from grasp-fit anchors 120/300; not a full held-out episode or a silhouette benchmark.",
+  "samples": [
+    {"frame": 60, "camera": "top", "object": 2, "uv": [481, 351]},
+    {"frame": 60, "camera": "right", "object": 2, "uv": [238, 215]},
+    {"frame": 280, "camera": "left", "object": 0, "uv": [439, 181]},
+    {"frame": 360, "camera": "top", "object": 0, "uv": [340, 420]},
+    {"frame": 409, "camera": "top", "object": 0, "uv": [341, 420]}
+  ]
+}

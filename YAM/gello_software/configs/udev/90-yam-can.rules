@@ -1,0 +1,15 @@
+# Persistent USB-CAN names and low-latency GELLO serial links for the
+# four-pair YAM workstation.
+# Install this file as /etc/udev/rules.d/90-can.rules, then reconnect the
+# matching adapters before starting a YAM session.
+SUBSYSTEM=="net", ACTION=="add", KERNEL=="can*", ATTRS{serial}=="208A37AC45465006", NAME="can_follower_l"
+SUBSYSTEM=="net", ACTION=="add", KERNEL=="can*", ATTRS{serial}=="209E3367594E5018", NAME="can_follower_r"
+SUBSYSTEM=="net", ACTION=="add", KERNEL=="can*", ATTRS{serial}=="209E378145465006", NAME="can_follower_3"
+SUBSYSTEM=="net", ACTION=="add", KERNEL=="can*", ATTRS{serial}=="209F337E594E5018", NAME="can_follower_4"
+
+# Dynamixel response timing is unreliable with the FTDI default of 16 ms.
+# Match stable adapter serials so the setting survives reconnects and reboots.
+SUBSYSTEM=="usb-serial", ACTION=="add", DRIVER=="ftdi_sio", ATTRS{serial}=="FTC2FNQP", ATTR{latency_timer}="1"
+SUBSYSTEM=="usb-serial", ACTION=="add", DRIVER=="ftdi_sio", ATTRS{serial}=="FTBSX7UI", ATTR{latency_timer}="1"
+SUBSYSTEM=="usb-serial", ACTION=="add", DRIVER=="ftdi_sio", ATTRS{serial}=="FTBDW2CL", ATTR{latency_timer}="1"
+SUBSYSTEM=="usb-serial", ACTION=="add", DRIVER=="ftdi_sio", ATTRS{serial}=="FTBF66M6", ATTR{latency_timer}="1"

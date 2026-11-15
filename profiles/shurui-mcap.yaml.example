@@ -1,0 +1,20 @@
+arms:
+  left: /home/rhos/.config/yam/setup/version-0218d55f1295b4c9/left.yaml
+  right: /home/rhos/.config/yam/setup/version-0218d55f1295b4c9/right.yaml
+cameras:
+  config: /home/rhos/.config/yam/setup/version-0218d55f1295b4c9/cameras.yaml
+  required: true
+name: RhOS-nuc-1
+network:
+  hardware_port: 6001
+  host: 127.0.0.1
+  safety_port: 6002
+safety:
+  motors_per_arm: 7
+  profile: yam-v1
+  watchdog_ms: 400
+schema_version: 1
+storage:
+  min_free_gb: 50
+  root: /home/rhos/workspace/jiaxin/shurui/recordings
+  workspace_link: /home/rhos/workspace/jiaxin/shurui/data

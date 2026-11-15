@@ -1,0 +1,84 @@
+{
+  "status": "visual_reconstruction_initial_estimates",
+  "dimensions_source": "estimated from calibrated multiview images; not caliper measurements",
+  "cup": {
+    "radius_top": 0.0375,
+    "radius_bottom": 0.026,
+    "height": 0.08,
+    "wall": 0.0012,
+    "segments": 96
+  },
+  "table_z": 0.063,
+  "grid_spacing": 0.04,
+  "initial_top_rim_pixels": [
+    [
+      165,
+      421
+    ],
+    [
+      337,
+      418
+    ],
+    [
+      474,
+      355
+    ]
+  ],
+  "rim_height_estimate": 0.143,
+  "events": [
+    {
+      "object": 2,
+      "arm": 2,
+      "attach": 50,
+      "release": 139,
+      "settle": 150,
+      "stack_height": 0.014,
+      "rim_reference": {
+        "frame": 120,
+        "pixels": {
+          "top": [
+            368,
+            383
+          ],
+          "right": [
+            238,
+            215
+          ]
+        },
+        "source": "manual approximate rim ellipse centres, about 5-10 px uncertainty"
+      }
+    },
+    {
+      "object": 0,
+      "arm": 1,
+      "attach": 244,
+      "release": 328,
+      "settle": 340,
+      "stack_height": 0.028,
+      "rim_reference": {
+        "frame": 300,
+        "pixels": {
+          "top": [
+            306,
+            344
+          ],
+          "left": [
+            441,
+            183
+          ]
+        },
+        "source": "manual approximate rim ellipse centres, about 5-10 px uncertainty"
+      }
+    }
+  ],
+  "trajectory_source": "manual event annotations + estimated rigid grasp transform; not physical contact simulation",
+  "grid_spacing_xy": [
+    0.04,
+    0.05
+  ],
+  "grid_phase_xy": [
+    0.0125,
+    -0.0117
+  ],
+  "grid_source": "estimated rectangular printed grid from top image, not a metric reference"
+}

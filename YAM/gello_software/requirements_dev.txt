@@ -1,0 +1,2 @@
+# Compatibility entry point; pyproject.toml is the source of truth.
+.[dev,yam,realsense]

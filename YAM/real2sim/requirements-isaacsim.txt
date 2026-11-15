@@ -1,0 +1,9 @@
+# Simulator-only environment. Python 3.11. Do not install standalone usd-core:
+# Kit supplies its own USD/PhysX libraries after SimulationApp starts.
+isaacsim[all,extscache]==5.1.0
+numpy==1.26.0
+scipy==1.15.3
+opencv-python==4.11.0.86
+trimesh==4.5.1
+imageio==2.37.0
+imageio-ffmpeg==0.6.0

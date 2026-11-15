@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "task_id": "stack_cups",
+  "task_name": "叠杯初始摆放监督",
+  "profile_version": "v1",
+  "platform_id": "xtrainer",
+  "required_materials": [{"material_id":"MAT-00001","expected_name":"白色纸杯","quantity":3,"asset_id":"paper_cup","asset_version":"v1","asset_registry":"assets/registry/paper_cup.v1.json"}],
+  "role_bindings": {"left_source":"MAT-00001","stack_target":"MAT-00001","right_source":"MAT-00001"},
+  "verified_placement_quota_per_bin": [3,3,3,3,3,3,3,3,3],
+  "material_confirmation": "operator_declared_ids_and_counts_not_automatic_visual_identification",
+  "scope": "initial placement guidance; trajectories and grasp success not certified"
+}

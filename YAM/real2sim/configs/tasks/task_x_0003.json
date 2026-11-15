@@ -1,0 +1,66 @@
+{
+  "task_id": "TASK-X-0003",
+  "platform": "xtrainer",
+  "adapter": "mortar_pestle",
+  "task_name": "左臂取杵交给右臂，捣压研钵内粘土，再放回桌面",
+  "material_ids": [
+    "MAT-00107",
+    "MAT-00108"
+  ],
+  "table_z": 0.063,
+  "table_bounds_xy": [
+    [
+      -0.6,
+      0.23
+    ],
+    [
+      -0.95,
+      -0.21
+    ]
+  ],
+  "bowl_x_edges_m": [
+    -0.34,
+    -0.25,
+    -0.16,
+    -0.07
+  ],
+  "bowl_y_range_m": [
+    -0.79,
+    -0.64
+  ],
+  "pestle_x_range_m": [
+    -0.34,
+    -0.09
+  ],
+  "pestle_y_range_m": [
+    -0.43,
+    -0.32
+  ],
+  "pestle_yaw_edges_deg": [
+    -60,
+    -20,
+    20,
+    60
+  ],
+  "pestle_initial_orientation": "horizontal",
+  "stl_scale_to_m": 0.001,
+  "print_scale_confirmed": true,
+  "initial_orientation_confirmed": true,
+  "clay_radius_m": 0.015,
+  "clay_size_confirmed": false,
+  "clay_center_height_in_bowl_m": 0.035,
+  "image_margin_px": 12,
+  "object_clearance_m": 0.07,
+  "palm_to_grasp_proxy_m": 0.1657,
+  "handover_workspace_proxy_m": [
+    -0.13,
+    -0.54,
+    0.4
+  ],
+  "seed": 20260924,
+  "notes": [
+    "Clay is a fixed 30 mm sphere placeholder, not a deformable simulation",
+    "IK checks only palm workspace proxies; no grasp transform, handover collision or force validation",
+    "User confirmed STL units mm, print scale 100%, and horizontal pestle start"
+  ]
+}

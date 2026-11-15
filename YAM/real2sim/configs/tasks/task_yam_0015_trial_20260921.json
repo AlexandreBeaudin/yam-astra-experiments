@@ -1,0 +1,133 @@
+{
+  "task_id": "TASK-YAM-0015",
+  "task_name": "将物品放入抽屉",
+  "seed": 20260921,
+  "per_bin": 3,
+  "drawer_yaw_edges_deg": [
+    60,
+    65,
+    70,
+    75
+  ],
+  "drawer_center_u_m": [
+    0.2,
+    0.27
+  ],
+  "drawer_center_v_m": [
+    -0.4,
+    -0.28
+  ],
+  "provisional_workspace_uv_m": [
+    [
+      -0.06,
+      0.56
+    ],
+    [
+      -0.79,
+      0.01
+    ]
+  ],
+  "image_margin_px": 14,
+  "clearance_m": 0.015,
+  "pull_distance_m": 0.2,
+  "flange_proxy_clearance_m": 0.12,
+  "drawer_initial_state": "closed",
+  "target_drawer": "upper",
+  "quantities_confirmed": true,
+  "objects": [
+    {
+      "material_id": "MAT-00050",
+      "name": "抽屉",
+      "quantity": 1,
+      "size_m": [
+        0.314,
+        0.25,
+        0.254
+      ],
+      "expected_dimensions": "长250mm、高254mm、宽314mm、抽屉边厚5.9mm、内部长236mm、内部高248mm、内部宽312mm、单个抽屉高75.4mm、抽屉厚度1.7mm、抽屉把手长143.1mm、抽屉把手宽29.7mm、抽屉把手高19.8mm、抽屉把手厚度6.9mm"
+    },
+    {
+      "material_id": "MAT-00005",
+      "name": "小方块",
+      "quantity": 1,
+      "size_m": [
+        0.0344,
+        0.0344,
+        0.0344
+      ],
+      "expected_dimensions": "长34.4mm、宽34.4mm"
+    },
+    {
+      "material_id": "MAT-00012",
+      "name": "足球",
+      "quantity": 1,
+      "size_m": [
+        0.0356,
+        0.0356,
+        0.0356
+      ],
+      "expected_dimensions": "直径35.6mm"
+    },
+    {
+      "material_id": "MAT-00021",
+      "name": "海绵擦",
+      "quantity": 1,
+      "size_m": [
+        0.0985,
+        0.0654,
+        0.0273
+      ],
+      "expected_dimensions": "长98.5mm、宽65.4mm、高27.3mm"
+    },
+    {
+      "material_id": "MAT-00037",
+      "name": "纸手帕",
+      "quantity": 1,
+      "size_m": [
+        0.0742,
+        0.0526,
+        0.0246
+      ],
+      "expected_dimensions": "高74.2mm、长52.6mm、宽24.6mm"
+    },
+    {
+      "material_id": "MAT-00038",
+      "name": "玩具遥控器",
+      "quantity": 1,
+      "size_m": [
+        0.165,
+        0.0594,
+        0.0342
+      ],
+      "expected_dimensions": "高165mm、长59.4mm、宽34.2mm"
+    },
+    {
+      "material_id": "MAT-00048",
+      "name": "勺子",
+      "quantity": 1,
+      "size_m": [
+        0.1291,
+        0.0433,
+        0.0192
+      ],
+      "expected_dimensions": "长129.1mm、勺柄宽13.6mm、勺柄厚9.6mm、勺口宽43.3mm、勺口长40mm、勺口厚1.6mm、勺高19.2mm"
+    }
+  ],
+  "assumptions": [
+    "User confirmed cabinet front width250mm, depth314mm, height254mm on 2026-09-21. Handle directions remain estimated.",
+    "Cube height=34.4mm is assumed, not measured. Remote lies buttons up, length=165mm.",
+    "Workspace bounds and 200mm drawer pull travel are provisional, not surveyed.",
+    "IK checks flange position proxies 120mm above targets only; TCP and grasp orientation are uncalibrated.",
+    "No robot swept collision, arm occlusion, drawer articulation, contact or task success validation.",
+    "Three different material types per episode, one item each; all selected items go into the upper drawer.",
+    "User approved 60-75 degree oblique cabinet orientation for a six-layout field trial on 2026-09-21; not full distribution coverage."
+  ],
+  "selection": {
+    "count": 3,
+    "replacement": false,
+    "strategy": "balanced_random_combinations",
+    "source": "user instruction 2026-09-19; task columns require all selected objects in the same drawer"
+  },
+  "layout_count": 6,
+  "drawer_handle_projection_m": 0.0297
+}

@@ -1,0 +1,291 @@
+{
+  "platform_id": "yam",
+  "station_id": "yam_chenyuan",
+  "world_frame": "left_base",
+  "calibration_version": "yam_chenyuan_20260915_v1",
+  "calibration_status": "verified",
+  "acceptance": {
+    "basis": "User confirms measured desk projection distances approximately match; explicitly requests freezing this parameter combination",
+    "scope": [
+      "scene_reconstruction",
+      "placement_guidance"
+    ],
+    "precision_certification": false,
+    "reported_measurements": "approximately matches; exact measured values not supplied"
+  },
+  "robot": {
+    "model": "i2rt/i2rt/robot_models/arm/yam/yam.xml",
+    "joint_names": [
+      "joint1",
+      "joint2",
+      "joint3",
+      "joint4",
+      "joint5",
+      "joint6"
+    ],
+    "world_T_left_base": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "world_T_right_base": [
+      [
+        0.9995407745840197,
+        0.023209849489371385,
+        -0.019481859014459126,
+        -0.014272399354336456
+      ],
+      [
+        -0.022455655050461102,
+        0.9990224510633232,
+        0.03807736634386318,
+        -0.7978635602796035
+      ],
+      [
+        0.020346584485687776,
+        -0.037622402343694086,
+        0.9990848669365664,
+        0.024676652828643286
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "tool_transforms": null,
+    "joint_mapping_status": "same-side streams verified after arm-side repair; link6 is model flange, TCP not yet measured"
+  },
+  "cameras": {
+    "main": {
+      "serial": "408122072021",
+      "model": "D435",
+      "image_size": [
+        640,
+        480
+      ],
+      "saved_image_rotation_deg": 0,
+      "K": [
+        [
+          604.534423828125,
+          0,
+          313.1813049316406
+        ],
+        [
+          0,
+          604.1679077148438,
+          250.92767333984375
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "distortion": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "distortion.inverse_brown_conrady",
+      "intrinsics_source": "matching device factory profile read 2026-09-15; recorded MCAP lacks intrinsic snapshot",
+      "world_T_camera": [
+        [
+          -0.012147602264082069,
+          -0.9635190139001153,
+          0.26736406941132385,
+          0.0018560116635085045
+        ],
+        [
+          -0.9996385370519842,
+          0.0052885425920808915,
+          -0.026359562929240812,
+          -0.3604276875152456
+        ],
+        [
+          0.023983973811746273,
+          -0.2675876326929204,
+          -0.9632349805888472,
+          0.8233970804316117
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "source": "left_main"
+    },
+    "left": {
+      "serial": "260322274929",
+      "model": "D405",
+      "image_size": [
+        640,
+        480
+      ],
+      "saved_image_rotation_deg": 0,
+      "K": [
+        [
+          392.76287841796875,
+          0,
+          326.096435546875
+        ],
+        [
+          0,
+          392.3183898925781,
+          232.5527801513672
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "distortion": [
+        -0.053511843085289,
+        0.05941566824913025,
+        0.0008892405894584954,
+        -0.0002559534041211009,
+        -0.01977062225341797
+      ],
+      "distortion_model": "distortion.inverse_brown_conrady",
+      "intrinsics_source": "matching device factory profile read 2026-09-15; recorded MCAP lacks intrinsic snapshot",
+      "robot_mount": {
+        "arm": "left",
+        "link": "link6",
+        "link_T_camera": [
+          [
+            0.007420183225086752,
+            0.9040061854231172,
+            0.42745497727556214,
+            -0.07037136996738538
+          ],
+          [
+            0.999950982465523,
+            -0.003905630347569966,
+            -0.009098281036773848,
+            0.0014876217985167399
+          ],
+          [
+            -0.006555421202494277,
+            0.42750153539880226,
+            -0.9039908537615442,
+            -0.07471982705116983
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "source": "left_wrist"
+    },
+    "right": {
+      "serial": "260422272011",
+      "model": "D405",
+      "image_size": [
+        640,
+        480
+      ],
+      "saved_image_rotation_deg": 0,
+      "K": [
+        [
+          394.9420166015625,
+          0,
+          317.5007019042969
+        ],
+        [
+          0,
+          394.4251403808594,
+          235.5693359375
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "distortion": [
+        -0.05473092570900917,
+        0.05953969433903694,
+        0.0007309243083000183,
+        -7.082497904775664e-05,
+        -0.020554816350340843
+      ],
+      "distortion_model": "distortion.inverse_brown_conrady",
+      "intrinsics_source": "matching device factory profile read 2026-09-15; recorded MCAP lacks intrinsic snapshot",
+      "robot_mount": {
+        "arm": "right",
+        "link": "link6",
+        "link_T_camera": [
+          [
+            0.04970629660850623,
+            0.9018934583843631,
+            0.42908912104708596,
+            -0.07051502884515819
+          ],
+          [
+            0.9987489246068638,
+            -0.04253367950444442,
+            -0.026295849566929486,
+            0.0010912756318109478
+          ],
+          [
+            -0.0054653155536124876,
+            0.42985936750442794,
+            -0.9028793133606468,
+            -0.07763716994732477
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "source": "right_wrist"
+    }
+  },
+  "table": {
+    "normal_world": [
+      -0.016810848799794723,
+      0.03623189379439157,
+      0.9992020042187177
+    ],
+    "plane_d_m": 0.02766076995794705,
+    "equation": "normal_world dot world_point_m + plane_d_m = 0",
+    "board_surface_offset_m": 0.035,
+    "board_surface_offset_source": "user approximate measurement",
+    "z_at_world_origin_m": -0.027682860764050587,
+    "bounds_xy_m": null
+  },
+  "notes": "User-accepted for reconstruction and guidance. Workspace bounds, TCP and contact dynamics remain separate. Wrist cameras require runtime FK. Never treat inverse Brown-Conrady as OpenCV forward coefficients."
+}

@@ -1,0 +1,25 @@
+schema_version: 1
+name: yam-bimanual
+
+arms:
+  left: ../arms/yam_left.example.yaml
+  right: ../arms/yam_right.example.yaml
+
+cameras:
+  config: ../cameras/realsense_bimanual.example.yaml
+  required: true
+
+storage:
+  root: /mnt/sdb/YAM/data
+  workspace_link: ../../data
+  min_free_gb: 50
+
+network:
+  host: 127.0.0.1
+  hardware_port: 6001
+  safety_port: 6002
+
+safety:
+  profile: yam-v1
+  watchdog_ms: 400
+  motors_per_arm: 7

@@ -1,0 +1,25 @@
+{
+  "app_token": "REPLACE_WITH_BASE_APP_TOKEN",
+  "table_id": "REPLACE_WITH_TABLE_ID",
+  "fields": {
+    "material_id": "物料编号",
+    "name": "物料名称",
+    "category": "类别",
+    "material": "材料",
+    "quantity": "数量",
+    "length_mm": "长 mm",
+    "width_mm": "宽 mm",
+    "height_mm": "高 mm",
+    "mass_g": "重量 g",
+    "dimensions_source": "尺寸来源",
+    "key_dimensions": "关键尺寸说明",
+    "photos": "展示照片",
+    "source_files": "原始素材",
+    "source_uri": "大文件位置",
+    "location": "存放位置",
+    "model_status": "模型状态",
+    "asset_uri": "仿真资产地址",
+    "asset_version": "资产版本",
+    "notes": "备注"
+  }
+}

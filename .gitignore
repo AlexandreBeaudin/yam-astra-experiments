@@ -1,0 +1,22 @@
+# Local credentials, configuration and generated evidence
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.*
+!.env.example
+*.pem
+!integrations/inspect_robots/runtime-deps/certifi/cacert.pem
+*.key
+*.crt
+profiles/*.yaml
+*.local.json
+**/astra-yam3-run-*/
+**/.replay-render-*/
+recordings/
+data/
+*.mp4
+*.mcap
+*.bag
+*.bak

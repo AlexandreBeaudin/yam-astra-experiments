@@ -1,0 +1,99 @@
+{
+  "schema_version": "0.1-draft",
+  "platform_id": "xtrainer",
+  "task_id": "stack_cups",
+  "episode_id": "20260912135045",
+  "episode_path": "datasets/dataset_hejialong_stack_cups_20260912/collect_data/20260912135045",
+  "collection_path": "datasets/dataset_hejialong_stack_cups_20260912/collect_data",
+  "cad_source_dir": "../Assets/2D尺寸图 & 3D模型",
+  "observation_dir": "observation",
+  "cameras": [
+    {
+      "id": "top",
+      "image_dir": "topImg",
+      "intrinsics": "calibration/intrinsics/top.json",
+      "collector_flip_180": true
+    },
+    {
+      "id": "left",
+      "image_dir": "leftImg",
+      "intrinsics": "calibration/intrinsics/left.json",
+      "collector_flip_180": false
+    },
+    {
+      "id": "right",
+      "image_dir": "rightImg",
+      "intrinsics": "calibration/intrinsics/right.json",
+      "collector_flip_180": true
+    }
+  ],
+  "calibration_files": [
+    "calibration/results/20260912154818_top_eye_to_hand_compact.json",
+    "calibration/results/20260912161728_top_eye_to_hand_compact.json",
+    "calibration/results/20260912175145_wrist_cameras_fixed.json"
+  ],
+  "robot_model": null,
+  "model_joint_mapping": {
+    "status": "model_FK_validated_independent_100_configurations",
+    "left_arm": [
+      "J1_1",
+      "J1_2",
+      "J1_3",
+      "J1_4",
+      "J1_5",
+      "J1_6"
+    ],
+    "right_arm": [
+      "J2_1",
+      "J2_2",
+      "J2_3",
+      "J2_4",
+      "J2_5",
+      "J2_6"
+    ],
+    "left_gripper": [
+      "J1_7",
+      "J1_8"
+    ],
+    "right_gripper": [
+      "J2_7",
+      "J2_8"
+    ],
+    "conventions_project_relative": "configs/xtrainer_usd_conventions.json"
+  },
+  "source_joint_columns": {
+    "left_arm": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "right_arm": [
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ]
+  },
+  "command_derived_gripper_columns": [
+    6,
+    13
+  ],
+  "timing": {
+    "status": "unverified",
+    "assumed_fps": null
+  },
+  "backend": "isaac_sim_5.1_rtx",
+  "simulation_runtime_config": "configs/simulation_runtime.json",
+  "upstream_lock": "upstream_xtrainer.json",
+  "replay_mode": "visual_state",
+  "object_assets": [
+    "assets/cups/paper_cup/v1/asset.usda"
+  ],
+  "status": "visual_replay_prototype",
+  "robot_model_project_relative": "assets/upstream/robots/x_trainer.usd"
+}

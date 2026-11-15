@@ -1,0 +1,227 @@
+"""The Task — an embodiment-agnostic benchmark definition.
+
+Mirrors Inspect AI's ``Task = dataset + scorer + epochs/reducer``, adapted for
+robotics: the dataset is a sequence of [`Scene`][inspect_robots.scene.Scene] initial
+conditions and the rollout horizon (``max_steps``) lives here.
+"""
+
+from __future__ import annotations
+
+import math
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import Any, cast
+
+from inspect_robots.errors import ConfigError
+from inspect_robots.rubric import Rubric, check_unique, merge
+from inspect_robots.scene import Scene
+from inspect_robots.scorer import Scorer
+
+# How far, in ULPs, a seconds-times-hz product may sit from an integer and still
+# count as that integer when resolving a step budget.
+_STEP_ROUNDING_ULPS = 16
+
+
+@dataclass(frozen=True)
+class Epochs:
+    """Repeat count plus the reducer used to combine per-epoch scores.
+
+    Mirrors Inspect's ``Epochs(count, reducer)``; reducer is a registered name
+    (default ``"mean"``).
+    """
+
+    count: int = 1
+    reducer: str = "mean"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.count, int) or isinstance(self.count, bool) or self.count < 1:
+            raise ConfigError(f"Epochs count must be an integer >= 1, got {self.count!r}")
+
+
+@dataclass(frozen=True)
+class TaskEnvelope:
+    """Identity and rollout limits of a task, safe to hand to adapters.
+
+    This is what ``eval()`` passes to an embodiment's optional
+    ``bind_task(envelope)`` hook: enough for the adapter to display or
+    pre-allocate for the run (e.g. an operator countdown against
+    ``max_steps``), and nothing that would let it second-guess scoring or the
+    dataset. Deliberately carries no control rate — the rollout enforces no
+    wall-clock rate of its own (R1, revised); a self-paced embodiment owns its
+    own cadence.
+    """
+
+    name: str
+    max_steps: int
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.max_steps, int)
+            or isinstance(self.max_steps, bool)
+            or self.max_steps < 1
+        ):
+            raise ConfigError(
+                f"TaskEnvelope max_steps must be an integer >= 1, got {self.max_steps!r}"
+            )
+
+
+@dataclass
+class Task:
+    """A task: scenes, rubrics, a time budget and a number of trials, independent of any embodiment.
+
+    Declare what each trial is measured against with ``rubrics`` (see
+    [`Rubric`][inspect_robots.rubric.Rubric]), or pass ``scorer`` as shorthand
+    for one rubric per scorer, named after the scorer. ``scorer`` accepts scorer
+    objects or **registry names** (e.g. ``scorer="success_at_end"``), or a
+    sequence mixing both. Declare exactly one of the two.
+
+    Declare exactly one rollout horizon. ``max_steps`` is already resolved;
+    ``max_seconds`` is keyword-only and is resolved against the paired
+    embodiment's positive finite ``control_hz`` by ``eval()``.
+    """
+
+    name: str
+    scenes: Sequence[Scene]
+    scorer: Scorer | str | Sequence[Scorer | str] | None = None
+    max_steps: int | None = None
+    epochs: int | Epochs = 1
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+    max_seconds: float | None = field(default=None, kw_only=True)
+    rubrics: Sequence[Rubric] = field(default=(), kw_only=True)
+
+    def __post_init__(self) -> None:
+        if (self.scorer is None) == (not self.rubrics):
+            raise ConfigError(
+                f"Task {self.name!r}: declare exactly one of rubrics or scorer.\n"
+                "fix: pass rubrics=[Rubric(...)], or scorer=... as shorthand "
+                "for one rubric per scorer"
+            )
+        check_unique(self.rubrics, f"Task {self.name!r}")
+        if (self.max_steps is None) == (self.max_seconds is None):
+            raise ConfigError(
+                f"Task {self.name!r}: declare exactly one of max_steps or max_seconds"
+            )
+        if self.max_steps is not None and (
+            not isinstance(self.max_steps, int)
+            or isinstance(self.max_steps, bool)
+            or self.max_steps < 1
+        ):
+            raise ConfigError(f"Task {self.name!r}: max_steps must be >= 1, got {self.max_steps!r}")
+        if self.max_seconds is not None and (
+            isinstance(self.max_seconds, bool)
+            or not math.isfinite(self.max_seconds)
+            or self.max_seconds <= 0
+        ):
+            raise ConfigError(
+                f"Task {self.name!r}: max_seconds must be finite and > 0, got {self.max_seconds!r}"
+            )
+        # Scene ids become per-trial identity downstream (the rollout builds
+        # "{scene.id}-e{epoch}", which FrameStore turns into a filename), so a
+        # duplicate would silently overwrite another trial's frames.
+        seen: set[str] = set()
+        for scene in self.scenes:
+            if scene.id in seen:
+                raise ConfigError(f"Task {self.name!r}: duplicate scene id {scene.id!r}")
+            seen.add(scene.id)
+        _ = self.epoch_spec  # validates an int epochs count via Epochs
+        _ = self.scorers
+
+    @property
+    def task_rubrics(self) -> tuple[Rubric, ...]:
+        """The rubrics that apply to every scene, in declared order.
+
+        With the ``scorer`` shorthand, one rubric per scorer, named after it, so
+        results keep the scorer's name as their key.
+        """
+        if self.rubrics:
+            return tuple(self.rubrics)
+        return tuple(Rubric(name=s.name, scorer=s) for s in self._shorthand_scorers())
+
+    def rubrics_for(self, scene: Scene) -> tuple[Rubric, ...]:
+        """A scene's effective rubrics: the task's, with the scene's own replacing or adding."""
+        return merge(self.task_rubrics, scene.rubrics)
+
+    @property
+    def scorers(self) -> list[Scorer]:
+        """The task-level rubrics' scorers, resolved, in declared order."""
+        return [rubric.resolve_scorer() for rubric in self.task_rubrics]
+
+    def _shorthand_scorers(self) -> list[Scorer]:
+        """Resolve the ``scorer`` shorthand's registry names, preserving order."""
+        assert self.scorer is not None  # only called when no rubrics are declared
+        # A str IS a Sequence: treat it as a single registry name, never as a
+        # sequence of one-character "scorers".
+        if isinstance(self.scorer, str) or not isinstance(self.scorer, Sequence):
+            raw: list[Scorer | str] = [self.scorer]
+        else:
+            raw = list(self.scorer)
+        out: list[Scorer] = []
+        for entry in raw:
+            if isinstance(entry, str):
+                from inspect_robots.registry import resolve
+
+                out.append(cast(Scorer, resolve("scorer", entry)))
+            else:
+                out.append(entry)
+        seen_names: set[str] = set()
+        for s in out:
+            if s.name in seen_names:
+                raise ConfigError(f"Task {self.name!r}: duplicate scorer name {s.name!r}")
+            seen_names.add(s.name)
+        return out
+
+    @property
+    def epoch_spec(self) -> Epochs:
+        """Normalize an integer epoch count to an ``Epochs`` specification."""
+        return self.epochs if isinstance(self.epochs, Epochs) else Epochs(count=self.epochs)
+
+    @property
+    def envelope(self) -> TaskEnvelope:
+        """Return the already-resolved adapter view of a step-based task.
+
+        Seconds-based tasks require an embodiment rate and must use
+        [`resolve_envelope`][inspect_robots.task.Task.resolve_envelope].
+        """
+        return self.resolve_envelope(None)
+
+    def resolve_envelope(self, control_hz: float | None) -> TaskEnvelope:
+        """Resolve the adapter-safe task view against an embodiment rate.
+
+        Compatibility checking normally rejects an invalid rate before this
+        method is called. The validation here is a defensive public-API guard
+        for callers resolving envelopes directly.
+        """
+        if self.max_steps is not None:
+            return TaskEnvelope(name=self.name, max_steps=self.max_steps)
+
+        if (
+            control_hz is None
+            or isinstance(control_hz, bool)
+            or not math.isfinite(control_hz)
+            or control_hz <= 0
+        ):
+            raise ConfigError(
+                f"Task {self.name!r}: max_seconds requires an embodiment control_hz "
+                f"that is finite and > 0, got {control_hz!r}"
+            )
+
+        assert self.max_seconds is not None  # exactly-one invariant from __post_init__
+        raw_steps = self.max_seconds * control_hz
+        if not math.isfinite(raw_steps):
+            raise ConfigError(
+                f"Task {self.name!r}: max_seconds={self.max_seconds!r} at "
+                f"control_hz={control_hz!r} does not yield a finite step budget"
+            )
+        # A product within a few ULPs of an integer is that integer: 1.1 * 50.0
+        # is 55.00000000000001, which a bare ceil() turned into a 56th step.
+        # The tolerance is in ULPs of the product, so it absorbs rounding
+        # residue from literal or computed inputs (1.1 + 2.2, 1 / 0.06) but
+        # never a fractional step the float can actually represent.
+        nearest = round(raw_steps)
+        if abs(raw_steps - nearest) <= _STEP_ROUNDING_ULPS * math.ulp(nearest):
+            steps = nearest
+        else:
+            steps = math.ceil(raw_steps)
+        # Both factors are positive, so the ceiling is at least one step even
+        # where their binary-float product would underflow to 0.0.
+        return TaskEnvelope(name=self.name, max_steps=max(1, steps))

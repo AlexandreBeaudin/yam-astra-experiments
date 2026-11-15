@@ -1,0 +1,90 @@
+name: YAM foundation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gello:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read pinned real2sim revision
+        id: real2sim
+        run: echo "sha=$(git rev-parse HEAD:real2sim)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout private real2sim submodule at pinned revision
+        uses: actions/checkout@v4
+        with:
+          repository: yuz1wan/real2sim-guidance
+          ref: ${{ steps.real2sim.outputs.sha }}
+          path: real2sim
+          ssh-key: ${{ secrets.REAL2SIM_DEPLOY_KEY }}
+          persist-credentials: false
+
+      - name: Initialize public hardware submodules
+        run: git submodule update --init --recursive -- gello_software/third_party/DynamixelSDK gello_software/third_party/mujoco_menagerie
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Reproduce environment
+        working-directory: gello_software
+        run: uv sync --frozen --extra yam --extra realsense --extra mcap --extra guidance --extra dev
+
+      - name: Install video test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Test
+        working-directory: gello_software
+        run: |
+          uv run python -m compileall -q gello scripts experiments tests
+          uv run --frozen python -m pytest -q
+
+      - name: Build and smoke-test wheel
+        working-directory: gello_software
+        run: |
+          uv build
+          uv venv --python 3.11 .wheel-venv
+          uv pip install --python .wheel-venv/bin/python \
+            "../i2rt[yam]" dist/*.whl
+          .wheel-venv/bin/yam --version
+          .wheel-venv/bin/yam profile validate \
+            --profile configs/profiles/yam-bimanual.example.yaml
+
+  i2rt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Reproduce environment
+        working-directory: i2rt
+        run: uv sync --frozen --all-extras --dev
+
+      - name: Lint and test
+        working-directory: i2rt
+        run: |
+          uv run ruff check .
+          uv run pytest -q

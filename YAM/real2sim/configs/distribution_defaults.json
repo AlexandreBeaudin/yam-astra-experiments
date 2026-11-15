@@ -1,0 +1,9 @@
+{
+  "train": 100,
+  "validation": 30,
+  "seed": 20260923,
+  "min_pose_separation_m": 0.015,
+  "near_yaw_deg": 8.0,
+  "max_stratum_total_variation": 0.15,
+  "split_unit": "initial layout group; all repeated episodes inherit this split"
+}

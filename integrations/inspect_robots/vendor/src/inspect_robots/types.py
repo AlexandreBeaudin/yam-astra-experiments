@@ -1,0 +1,162 @@
+"""Core observation/action data types exchanged between policy and embodiment.
+
+These are the wire format of a rollout. They are deliberately small, immutable,
+and NumPy-native. Arrays are raw (the policy owns model-specific preprocessing);
+images are ``(H, W, C)`` ``uint8``.
+
+The dataclasses set ``eq=False`` because they carry NumPy arrays, whose
+element-wise ``==`` does not yield a single bool — identity/round-trip semantics
+are what callers actually need here.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import Any
+
+import numpy as np
+import numpy.typing as npt
+
+ImageArray = npt.NDArray[np.uint8]
+StateArray = npt.NDArray[np.floating[Any]]
+
+
+@dataclass(frozen=True, eq=False)
+class Observation:
+    """A single multi-modal observation produced by an embodiment.
+
+    ``images`` are keyed by camera name; ``state`` holds proprioception keyed by a
+    controlled vocabulary (e.g. ``"eef_pos"``, ``"gripper"``). ``instruction`` is
+    the language goal for this step (usually constant across an episode, but may
+    change for long-horizon tasks). The rollout injects ``extra["env_step"]`` (int),
+    ``extra["approvals"]`` (list of ``{"t": int, "detail": str | None}`` records for
+    safety interventions since the previous ``act()`` call), and
+    ``extra["operator_messages"]`` (list of
+    ``{"t": int, "text": str, "source": str}`` records for live feedback since the
+    previous ``act()`` call) into the policy-facing observation and reserves those keys;
+    embodiments should not set them.
+    """
+
+    images: Mapping[str, ImageArray] = field(default_factory=dict)
+    state: Mapping[str, StateArray] = field(default_factory=dict)
+    instruction: str | None = None
+    image_times: Mapping[str, float] = field(default_factory=dict)
+    state_time: float = 0.0
+    extra: Mapping[str, Any] = field(default_factory=dict)
+
+
+# Standard terminal-action kinds. A policy may define others; it declares the
+# kinds it can emit in ``PolicyInfo.terminal_actions``.
+DONE = "done"
+GIVE_UP = "give_up"
+
+
+@dataclass(frozen=True)
+class Termination:
+    """A policy's decision to end the trial: the terminal part of its action space.
+
+    ``kind`` names the terminal action (``"done"``, ``"give_up"``, or any other
+    kind the policy declares in ``PolicyInfo.terminal_actions``) and becomes the
+    record's termination reason; ``reason`` is the policy's stated explanation,
+    recorded verbatim as the termination detail. Ending a trial is not a claim of
+    success: scoring stays with the task's scorers.
+    """
+
+    kind: str
+    reason: str = ""
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.kind, str) or not self.kind.strip():
+            raise ValueError("Termination.kind must be a non-empty string")
+        if not isinstance(self.reason, str):
+            raise ValueError("Termination.reason must be a string")
+
+
+@dataclass(frozen=True, eq=False)
+class Action:
+    """A single action to apply to an embodiment.
+
+    Semantics (control mode, rotation representation, gripper kind, frame) live on
+    the action *space*, not on every action instance —
+    see [`inspect_robots.spaces`][inspect_robots.spaces]. ``terminal`` is set by
+    the action manager on the last action it executes from a terminal chunk: the
+    trial ends after this action, unless the embodiment ends it first.
+    """
+
+    data: StateArray
+    meta: Mapping[str, Any] = field(default_factory=dict)
+    terminal: Termination | None = None
+
+    def __post_init__(self) -> None:
+        _check_terminal(self.terminal, "Action")
+
+
+def _check_terminal(terminal: object, owner: str) -> None:
+    """Reject a ``terminal`` that is not a ``Termination``, where the policy builds it."""
+    if terminal is not None and not isinstance(terminal, Termination):
+        raise TypeError(
+            f"{owner}.terminal must be a Termination or None, got {type(terminal).__name__}"
+        )
+
+
+@dataclass(frozen=True, eq=False)
+class ActionChunk:
+    """A horizon of actions predicted by one policy inference.
+
+    Modern VLAs (π0, ACT, diffusion policies) predict ``H`` future actions that
+    are executed open-loop because inference is slower than the control rate.
+    ``H == 1`` is the degenerate "reactive policy" case. ``control_hz`` is the
+    rate the chunk was intended to be played at — advisory metadata a consumer
+    may honor (the rollout enforces no rate; ``None`` leaves it unspecified).
+    ``inference_latency_s``, when measured, is logged.
+
+    ``terminal`` ends the trial after the chunk's actions: the policy chose a
+    terminal action (``done``, ``give_up``, ...). A terminal chunk may have no
+    actions, which ends the trial without moving the embodiment; every other
+    chunk needs at least one action.
+    """
+
+    actions: Sequence[Action]
+    control_hz: float | None = None
+    inference_latency_s: float | None = None
+    meta: Mapping[str, Any] = field(default_factory=dict)
+    terminal: Termination | None = None
+
+    def __post_init__(self) -> None:
+        _check_terminal(self.terminal, "ActionChunk")
+        if len(self.actions) == 0 and self.terminal is None:
+            raise ValueError("ActionChunk must contain at least one action unless it is terminal")
+
+    def __len__(self) -> int:
+        return len(self.actions)
+
+
+# Standard termination reason for "a human operator ended this episode by
+# keypress, without giving a verdict". Non-definitive on purpose: the verdict
+# (y/n/partial/skip + optional grader note) is collected by the CLI's operator
+# prompt, which fires for attended trials that end with this reason (#194).
+OPERATOR_END = "operator_end"
+
+# Termination reasons for a trial that ran out of its budget: ``max_steps`` for a
+# step budget, ``max_seconds`` for a budget declared in seconds.
+HORIZON_REASONS = frozenset({"max_steps", "max_seconds"})
+
+
+@dataclass(frozen=True, eq=False)
+class StepResult:
+    """The outcome of applying one action to an embodiment.
+
+    ``terminated`` means the task ended (success or hard failure);
+    ``termination_reason`` disambiguates (e.g. ``"success"``, ``"collision"``,
+    ``"fault"``, ``"out_of_bounds"``, ``"operator_end"`` — the standard reason
+    for operator-ended episodes awaiting a verdict). ``truncated`` means a
+    time/horizon cutoff. A simulator may expose privileged success via ``info``.
+    """
+
+    observation: Observation
+    reward: float | None = None
+    terminated: bool = False
+    termination_reason: str | None = None
+    truncated: bool = False
+    info: Mapping[str, Any] = field(default_factory=dict)

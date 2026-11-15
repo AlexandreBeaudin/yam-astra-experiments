@@ -1,0 +1,28 @@
+name: ROS 2 workspace
+
+on:
+  push:
+    paths:
+      - "gello_software/ros2/**"
+      - ".github/workflows/ros2.yml"
+  pull_request:
+    paths:
+      - "gello_software/ros2/**"
+      - ".github/workflows/ros2.yml"
+
+jobs:
+  test-in-devcontainer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test ROS 2 workspace
+        uses: devcontainers/ci@v0.3
+        with:
+          subFolder: ./gello_software/ros2
+          runCmd: |
+            cd gello_software/ros2
+            colcon build \
+              --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCHECK_TIDY=ON
+            colcon test --event-handlers console_direct+ --pytest-args -v
+            colcon test-result --verbose

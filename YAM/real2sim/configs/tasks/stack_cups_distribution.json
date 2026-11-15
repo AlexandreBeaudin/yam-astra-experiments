@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "task_id": "stack_cups",
+  "platform_adapter": "xtrainer",
+  "asset_id": "paper_cup",
+  "asset_version": "v1",
+  "roles": ["left_source", "stack_target", "right_source"],
+  "cup": {"radius_top": 0.0375, "radius_bottom": 0.026, "height": 0.08, "wall": 0.0012},
+  "table_z": 0.063,
+  "table_bounds_xy": [[-0.60, 0.23], [-0.95, -0.21]],
+  "clearance_m": 0.025,
+  "image_margin_px": 12,
+  "depth_bin_edges_m": [-0.40, -0.28, -0.16, -0.04],
+  "depth_bin_meaning": "mean world X of the two source cups",
+  "target_x_range_m": [-0.17, -0.07],
+  "target_y_range_m": [-0.55, -0.53],
+  "spread_ranges_m": [[0.115, 0.145], [0.15, 0.185], [0.19, 0.225]],
+  "quality": "placement_guidance_prototype",
+  "limitations": ["estimated cup dimensions and table plane", "provisional right base extrinsics", "estimated installed tool transform", "IK waypoints do not establish collision-free paths or task success", "top visibility checked separately from wrist views"]
+}

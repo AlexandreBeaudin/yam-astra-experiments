@@ -1,0 +1,13 @@
+{
+  "insert": {
+    "material": "PLA",
+    "source": "user confirmed",
+    "friction_identified": false,
+    "compliance_identified": false
+  },
+  "cup": {
+    "material": "unconfirmed",
+    "dimensions": "estimated"
+  },
+  "note": "PLA confirmation alone does not determine pairwise friction or contact stiffness."
+}

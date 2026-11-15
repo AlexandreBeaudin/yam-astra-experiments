@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "platform_id": "xtrainer",
+  "confirmation_date": "2026-09-15",
+  "source": "user statement in project conversation",
+  "user_statement": "采集和标定时都已安装",
+  "scope": "2026-09-12 stack cups data collection and associated camera calibration",
+  "modified_baseplate_installed_during_collection": true,
+  "modified_gripper_installed_during_collection": true,
+  "modified_baseplate_installed_during_calibration": true,
+  "modified_gripper_installed_during_calibration": true,
+  "baseplate_model": "xtrainer夹爪底板-改进版.stl",
+  "insert_material": "PLA",
+  "insert_variant": "unresolved between 夹具.stl and 夹具-大号.stl",
+  "installed_transform_measured": false,
+  "note": "Confirms hardware configuration timing only. Does not validate estimated CAD assembly transforms, actual aperture, contact parameters, or calibration accuracy. Existing simulation runs remain historical results."
+}

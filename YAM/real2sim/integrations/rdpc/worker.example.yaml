@@ -1,0 +1,25 @@
+schema_version: 1
+listen: 127.0.0.1:8851
+public_url: https://real2sim-worker.example.invalid
+scheduler_url: https://scheduler.example.invalid
+worker_id: r2sg-local
+token_env: RDPC_WORKER_TOKEN
+database: /home/rhos/workspace/YAM/real2sim/.runtime/rdpc-real2sim/worker.sqlite3
+capacity: 1
+heartbeat_seconds: 5
+sync_seconds: 2
+task_types:
+  tel.placement_strategy:
+    enabled: true
+    health_url: http://127.0.0.1:8852/health
+    health_timeout_seconds: 1
+  tel.simulation_asset:
+    enabled: true
+    health_url: http://127.0.0.1:8852/health
+    health_timeout_seconds: 1
+  tel.placement_supplement:
+    enabled: true
+    health_url: http://127.0.0.1:8852/health
+    health_timeout_seconds: 1
+storage_mounts: {}
+cloud_cache_root: /home/rhos/workspace/YAM/real2sim/.runtime/rdpc-real2sim/cloud-cache

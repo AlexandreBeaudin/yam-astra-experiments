@@ -1,0 +1,20 @@
+{
+  "revision": "dimension-audit-20260920",
+  "status": "axis_mapping_pending_physical_confirmation",
+  "axis_convention": "Model x=longitudinal/depth, y=transverse/front width, z=up. Cabinet opens toward -x. Other items rest in the photographed flat pose.",
+  "materials": {
+    "MAT-00050": {
+      "size_m": [0.314, 0.250, 0.254],
+      "source": "长250mm、高254mm、宽314mm；内部长236mm、内部高248mm、内部宽312mm",
+      "mapping_basis": "Photo/front aspect and paired outer/inner dimensions support front width250/236, depth314/312, height254/248. Former code swapped width and depth.",
+      "geometry": {"cavity_size_m": [0.312,0.236,0.248], "drawer_height_m":0.0754, "drawer_wall_m":0.0017, "front_edge_thickness_m":0.0059, "handle_span_m":0.1431, "handle_projection_m":0.0297, "handle_height_m":0.0198, "handle_section_m":0.0069},
+      "assumptions": ["Await confirmation of cabinet axes and handle projection29.7/height19.8; these directions are not explicitly labelled in the table.", "Cavity dimensions are prioritized; shell thickness is derived per axis, not uniformly set to5.9mm.", "Clearance, inter-drawer spacing, finger notch and backing plate dimensions are estimated; backing plate is not included in handle dimension measurement."]
+    },
+    "MAT-00005": {"size_m":[0.0344,0.0344,0.0344], "source":"长34.4mm、宽34.4mm", "assumptions":["Height34.4mm is unmeasured and inferred from cube photo."]},
+    "MAT-00012": {"size_m":[0.0356,0.0356,0.0356], "source":"直径35.6mm", "assumptions":["Black patch pattern approximate; no texture recovery."]},
+    "MAT-00021": {"size_m":[0.0985,0.0654,0.0273], "source":"长98.5mm、宽65.4mm、高27.3mm", "assumptions":["Green/yellow layer split and corner radii inferred from photo."]},
+    "MAT-00037": {"size_m":[0.0742,0.0526,0.0246], "source":"高74.2mm、长52.6mm、宽24.6mm", "assumptions":["Flat pose:74.2long axis,52.6across,24.6vertical; label dimensions are product-frame names, not world axes. Artwork approximate."]},
+    "MAT-00038": {"size_m":[0.165,0.0594,0.0342], "source":"高165mm、长59.4mm、宽34.2mm", "assumptions":["Buttons-up flat pose:165long axis,59.4across,34.2vertical. Individual key positions/heights inferred."]},
+    "MAT-00048": {"size_m":[0.1291,0.0433,0.0192], "source":"长129.1mm、勺柄宽13.6mm、勺柄厚9.6mm、勺口宽43.3mm、勺口长40mm、勺口厚1.6mm、勺高19.2mm", "geometry":{"bowl_length_m":0.040,"bowl_width_m":0.0433,"bowl_vertical_thickness_m":0.0016,"handle_width_m":0.0136,"handle_thickness_m":0.0096}, "assumptions":["Bowl curvature inferred.1.6mm is modeled as vertical thickness; normal wall thickness was not measured."]}
+  }
+}

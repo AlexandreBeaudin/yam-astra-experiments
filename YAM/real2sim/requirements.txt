@@ -1,0 +1,9 @@
+# Utility/offline environment. Simulation uses requirements-isaacsim.txt
+# and scripts/isaac_python.sh in an independent Python 3.11 environment.
+numpy==1.26.4
+scipy==1.15.3
+opencv-python==4.11.0.86
+usd-core==26.8
+trimesh==5.1.0
+imageio==2.37.4
+imageio-ffmpeg==0.6.0

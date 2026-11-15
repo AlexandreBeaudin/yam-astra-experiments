@@ -1,0 +1,15 @@
+# Merge the auxiliary_pairs section into the machine-local YAM profile after
+# assigning stable CAN names with configs/udev/90-yam-can.rules. Do not add
+# these pairs to arms: only calibrated left/right arms are accepted by the
+# bimanual safety daemon.
+auxiliary_pairs:
+  third:
+    config: ../arms/yam_third.yaml
+    leader_port: /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTBDW2CL-if00-port0
+    can_channel: can_follower_3
+    can_adapter_serial: "209E378145465006"
+  fourth:
+    config: ../arms/yam_fourth.yaml
+    leader_port: /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTBF66M6-if00-port0
+    can_channel: can_follower_4
+    can_adapter_serial: "209F337E594E5018"

@@ -1,0 +1,31 @@
+.agents/
+.codex/
+data
+AGENTS.md
+feishu.md
+!/feishu.md
+
+**/.venv/
+**/__pycache__/
+**/*.egg-info/
+**/*.pyc
+**/.pytest_cache/
+**/.ruff_cache/
+**/build/
+**/dist/
+
+# Local collection exports and preview artifacts
+/video/
+/realsense-three-preview-corrected.png
+
+# Workstation-only runtime environments, credentials and generated recordings
+**/.runtime/
+.env
+.env.*
+!.env.example
+*.mcap
+*.mcap.partial
+*.log
+/playwright-report/
+/test-results/
+/gello_software/configs/guidance/*.local.json

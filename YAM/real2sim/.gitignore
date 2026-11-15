@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+runs/*
+!runs/.gitkeep
+external/*
+!external/README.md
+
+assets/upstream/
+configs/local_paths.json
+configs/*.local.json
+.env
+.env.*
+!.env.example
+
+# Generated material assets travel separately from source history
+assets/materials/
+assets/cups/
+assets/registry/
+*.bundle
+.runtime/

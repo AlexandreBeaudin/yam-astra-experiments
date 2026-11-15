@@ -1,0 +1,280 @@
+{
+  "repository": "https://github.com/robocurve/inspect-robots",
+  "revision": "772019598e42ccc7921a043dee3a2ea2692020ea",
+  "revision_source": "upstream main resolved via GitHub connector, NOT the unknown QZ pin",
+  "qz_revision": null,
+  "qz_checkout": null,
+  "yam_audit": {
+    "repository": "https://github.com/robocurve/inspect-robots-yam",
+    "revision": "5a017d1b47b731f00cb7f26e59831dca03a15a71",
+    "installed_or_imported": false
+  },
+  "files": [
+    {
+      "path": "src/inspect_robots/__init__.py",
+      "git_blob_sha1": "880a772c2c1cb3c9a3b8c1cb9a8586cc55fb61af",
+      "sha256": "c13acdc1d0e556eaabfdbf3f9d92ff57a3cb8fdfb8572b4fa441cedd3fc0709f"
+    },
+    {
+      "path": "src/inspect_robots/_builtins.py",
+      "git_blob_sha1": "e34d53e90e952176b6790966d78f0e88adcb1251",
+      "sha256": "48b6ef19e0c8825a4d35c9d289b466b8efd536e063a4c239f75b9bfbf30bc0f7"
+    },
+    {
+      "path": "src/inspect_robots/_chatwire.py",
+      "git_blob_sha1": "56feebcef4a7d0da4cf663d4171b4bff30014759",
+      "sha256": "d57678d79a4462e684b172fcf71be3e55797c873f71b95d181dd0826fddfb6d5"
+    },
+    {
+      "path": "src/inspect_robots/_claims.py",
+      "git_blob_sha1": "8c0f57c03b08dc9e1640851c675f54cf4258ca7a",
+      "sha256": "8204164f772c3e37317a9f9666825d7ab60c3a3a3a02f865f969815dc8963fd3"
+    },
+    {
+      "path": "src/inspect_robots/_dotenv.py",
+      "git_blob_sha1": "630e4ad961f2e99ddf96fd2edd57dfa4656af0e7",
+      "sha256": "7db5558441e054fc70de8aae100c6e9bc46157ae513810afb0029c92ef2c7b74"
+    },
+    {
+      "path": "src/inspect_robots/_html.py",
+      "git_blob_sha1": "c498363cb6bbe11815b20985266d7b1338d39bba",
+      "sha256": "1e939c89d032e0e4c26647c81e28417a4c2319f1657c6eeac40365d7b41cc0da"
+    },
+    {
+      "path": "src/inspect_robots/_html_index.py",
+      "git_blob_sha1": "afc746d56c7fc35eb2c0b7b3f808ee61dd12bbb5",
+      "sha256": "a33d00f406d91823ba7cf089191a4c9ad993babd16853ad10151ec6dfdf517e2"
+    },
+    {
+      "path": "src/inspect_robots/_parallel.py",
+      "git_blob_sha1": "28255366c5443085ed920dbfb73d21fca2ba3749",
+      "sha256": "2f1a958b9f5294e440fb9639cf18e1c2dd9d14b35d9835321902df4306b256dd"
+    },
+    {
+      "path": "src/inspect_robots/_pngenc.py",
+      "git_blob_sha1": "9afcc871e59d19d67be9339827a84ee4b619670f",
+      "sha256": "ccf5185c13f3f0767ef829074e0fa244953f1c1775040018def5c9abef4f8f4d"
+    },
+    {
+      "path": "src/inspect_robots/_pointers.py",
+      "git_blob_sha1": "e31d3dbb70d01a688125c336993c74b784db8f3a",
+      "sha256": "940b60df266cbd3a56230060641accc6d4971f9592f4f1362392f2a9c7c7c9d8"
+    },
+    {
+      "path": "src/inspect_robots/_setup.py",
+      "git_blob_sha1": "ab5acc9b19997c8bab3407ab961c22765cd5741f",
+      "sha256": "dcc0075e6e0b6c507c8897a13c4b4aeb0baf00f7d294d2d9a801710a47245dff"
+    },
+    {
+      "path": "src/inspect_robots/_summarize.py",
+      "git_blob_sha1": "f360905990dd99fe5f749b7bcafcaefc78874c43",
+      "sha256": "2ac435c3cf11cdea0755d68cce9fae8f67fc45c57227b183f93f89168326e9a5"
+    },
+    {
+      "path": "src/inspect_robots/_video.py",
+      "git_blob_sha1": "85ac0c6d5dcaa4c784d11da9ea34a2e7e7960f2f",
+      "sha256": "84979c27d3bba708a53772064ae8a0a4c80ed3c3f2dfd9c114ceda6409cb9267"
+    },
+    {
+      "path": "src/inspect_robots/action_manager.py",
+      "git_blob_sha1": "619721738df9eed572459d2a20b613e72f84bf67",
+      "sha256": "72101b595dd36a3209d25c1950397c65633556249ee02e5f37f016f7094c2c46"
+    },
+    {
+      "path": "src/inspect_robots/analyzer.py",
+      "git_blob_sha1": "11cb700f64045bf7573a792d49bceb931af29cc3",
+      "sha256": "364c9552b582e01abf45c5b80acf784611a10b3d2f05e017775ba61ecf28eb7f"
+    },
+    {
+      "path": "src/inspect_robots/annotation.py",
+      "git_blob_sha1": "f699021bd012ec6900595a3fa86b7eafb4821c9a",
+      "sha256": "650d14722f8ede4a3b42528a337a00de0b366441a057988e821743cac01d3dff"
+    },
+    {
+      "path": "src/inspect_robots/cli.py",
+      "git_blob_sha1": "e711277787877e9f80f4e667a902b4761b15de5e",
+      "sha256": "1a71d4fd531a49361048f22449a472f359f45b099bfdc2e20e9fe01176ecabc9"
+    },
+    {
+      "path": "src/inspect_robots/compat.py",
+      "git_blob_sha1": "dfc01b455454ba1a60c8647b23bf8a01b3a9e9bb",
+      "sha256": "b2e353a70fcc1793f6d7896b51d32ac14a1dbad729031b33da726bfce94ffd62"
+    },
+    {
+      "path": "src/inspect_robots/conformance.py",
+      "git_blob_sha1": "a452f6767157261485696a30c52ff889a666c1fc",
+      "sha256": "295c1bc6732eb2d9a1f022777e04f5e19d8e00f801e0fe1bfea24098cac93da7"
+    },
+    {
+      "path": "src/inspect_robots/console.py",
+      "git_blob_sha1": "be402cf61e2efe23ac1fc0ffc166afa86a944cff",
+      "sha256": "2e35a032492f7bdda8c5176046e0d5d68f6b7077c2d6c0ae566776801e09de21"
+    },
+    {
+      "path": "src/inspect_robots/defaults.py",
+      "git_blob_sha1": "30b4289842f73e79e80d15e9535ed7619ba56a23",
+      "sha256": "ffee1c13749beb2159f625b8eecdae864f16b9c87705823dc09623b90d80b44b"
+    },
+    {
+      "path": "src/inspect_robots/embodiment.py",
+      "git_blob_sha1": "8166dbf0b4defcc8662ba5203d1a65c63e5e34c4",
+      "sha256": "26e797d53b3d7ea3acf8a05d7bf3daa06084db6f1859be7441b810dd9d31b815"
+    },
+    {
+      "path": "src/inspect_robots/errors.py",
+      "git_blob_sha1": "6918d16f47ccd1d6fa613ce4c071693f4c22317b",
+      "sha256": "e97a2ef15f0fb06b7b8db2b32832cec62a0a3b523d76b415441df8d883b4f38a"
+    },
+    {
+      "path": "src/inspect_robots/eval.py",
+      "git_blob_sha1": "a9a6260450f28a5586700cb221611208a26c8300",
+      "sha256": "8290068026bee12fd3d19775590d66a992b5f17a4c38e53a5bf6e69012f0535f"
+    },
+    {
+      "path": "src/inspect_robots/frames.py",
+      "git_blob_sha1": "3cc4795e2da471371ab2f1b8f2d91d37fd0d230e",
+      "sha256": "a0621c81eda48ed5de8d0600d2176359d44dfccb38f074914e0773276cfbd613"
+    },
+    {
+      "path": "src/inspect_robots/grader.py",
+      "git_blob_sha1": "c125465b5030cd45e5db483c0128529f2387e47d",
+      "sha256": "0fe660b132a3981a041bf51213f59b681288cd59ae2adbe81454d7c247479796"
+    },
+    {
+      "path": "src/inspect_robots/guard.py",
+      "git_blob_sha1": "0c2060612a67db59a74e2dfdeaf7d953e3794063",
+      "sha256": "a2e35821f95dbcf932383144ba88e0b3b8ff806ed0275b3a95e748d31b826452"
+    },
+    {
+      "path": "src/inspect_robots/log.py",
+      "git_blob_sha1": "0c78c47c177ee3d5fb4810417da3cb42136d029e",
+      "sha256": "7106bdf71574a7690ede0e00e9326deb3e463dd06b48f54a870e1715b525a090"
+    },
+    {
+      "path": "src/inspect_robots/policy.py",
+      "git_blob_sha1": "89ddff87eb2086bb0a1b33b5281cc4b3624ab443",
+      "sha256": "3dd3bfc7aa267d2719bedaa58fa2058fa84fe46502655c886eea16d87eb9f2dd"
+    },
+    {
+      "path": "src/inspect_robots/policy_adapter.py",
+      "git_blob_sha1": "abf7b98e5858c69f20bfb639c23f86a0996cd512",
+      "sha256": "816101d1c7550f2acbb272316c107e788630b75e5775a65f1f624f2d92141d22"
+    },
+    {
+      "path": "src/inspect_robots/registry.py",
+      "git_blob_sha1": "277d2708fe614c637ab0f16275172453ce306f4a",
+      "sha256": "9688825a0f9c3cd305f24633d0410106475b57191c07997720701d8663028774"
+    },
+    {
+      "path": "src/inspect_robots/rollout.py",
+      "git_blob_sha1": null,
+      "sha256": "bcd53e67362d1d2a7974f6e65a93e73924da3fa32d4a546531982e43ae5e53fd",
+      "upstream_sha256": "977f0cc7dbd5f9ac27d8f4489dbf32cc407168054624ff02b9901cfc169fe8eb",
+      "upstream_git_blob_sha1": "574288b58120fc5e06ece41d26d47bcb22c7121b",
+      "local_patch": "Share delta guard reference with absolute trajectory generation; see OFFLINE_RUN_001_003_REVIEW.md"
+    },
+    {
+      "path": "src/inspect_robots/rubric.py",
+      "git_blob_sha1": "0576bd7b0d6b1999eb4c19b2f007a952e600585a",
+      "sha256": "5f86ad9d06ce1921fe8b4b7b45aadc11cdeda4095d60e17c12341f140738003a"
+    },
+    {
+      "path": "src/inspect_robots/scene.py",
+      "git_blob_sha1": "8aed761d469ed87e1decdcaabbdd7cecb0f97ea0",
+      "sha256": "b91ce79275e6a6e72155685d371550105952fb61532bc8ec445bf6007886ac23"
+    },
+    {
+      "path": "src/inspect_robots/scorer.py",
+      "git_blob_sha1": "e3c159e622ff4effa5d7d54a757725f773b5879b",
+      "sha256": "beac65e31fb91cd202d7b145aad329017da836b7067b455012f6f11860a5e97f"
+    },
+    {
+      "path": "src/inspect_robots/session.py",
+      "git_blob_sha1": "8d818cdd79dfb892db7a084a6986bbedee606a2c",
+      "sha256": "7d7f0f9bf91fe959c4d1059189b830c99976915e11dc61d0e13bcf807c1ce2dd"
+    },
+    {
+      "path": "src/inspect_robots/spaces.py",
+      "git_blob_sha1": "ae215c511b450e4a08799f3c66457dd479d86bb1",
+      "sha256": "b6cdd32341229b2038c71907f70bd03aeef734a8010c391e06667e152f67690b"
+    },
+    {
+      "path": "src/inspect_robots/task.py",
+      "git_blob_sha1": "1fab2b3c1e594e7d7a22b40de794d1a32599a93e",
+      "sha256": "8dfa56e23b16df794ad50ef8bb311f5cbdec01d040a282b9f7994709e7ea09cd"
+    },
+    {
+      "path": "src/inspect_robots/taskgen.py",
+      "git_blob_sha1": "f18026ab9fa33cb96b8e8e3c8528cd3435baf2e4",
+      "sha256": "05a452b4d28ec8e2813c7ad95190c6119d10a025609dec45d2394a9fed283613"
+    },
+    {
+      "path": "src/inspect_robots/tools.py",
+      "git_blob_sha1": null,
+      "sha256": "ac7dfd6bad0ee839f169bbecf695b3213b11f04455bc2645d0e133d0e1286b15",
+      "upstream_sha256": "7fc31e52dd4582a5ffda864096b8bbf7e0af4635c56358596aeb344f5b85d343",
+      "upstream_git_blob_sha1": "b3129f99ef50c82a419fff0fbd7abe82267ef004",
+      "local_patch": "Share delta guard reference with absolute trajectory generation; see OFFLINE_RUN_001_003_REVIEW.md"
+    },
+    {
+      "path": "src/inspect_robots/transcript.py",
+      "git_blob_sha1": "2b4667ac78dc6dc9c47c194bca34b528848029dd",
+      "sha256": "61305d9ae638ba42093dac7ac836982586574a00465bb8b2f2622011279e4b1d"
+    },
+    {
+      "path": "src/inspect_robots/types.py",
+      "git_blob_sha1": "5ba82534b05871bcdd73fa21c63ca5ec2c721227",
+      "sha256": "32cac1a8a677fc0668d890804e9fa5a8651188a734c280a5c1dbd896e70cbd23"
+    },
+    {
+      "path": "src/inspect_robots/logging/__init__.py",
+      "git_blob_sha1": "9d95eac5aa22af734357d465da605e5a20af537d",
+      "sha256": "7be928cdc807608584a7f4d2005f223bb2b28f78609184ecb95cca8bea4a4655"
+    },
+    {
+      "path": "src/inspect_robots/logging/json_log.py",
+      "git_blob_sha1": "2b2c48806d5f084100fcbdb758e88de49aeea597",
+      "sha256": "ddb4d588a36f0c6b6c4061494929411a51d1a412d4cc1da897914a340cacbc0f"
+    },
+    {
+      "path": "src/inspect_robots/logging/live_log.py",
+      "git_blob_sha1": "90d3376b03a0a3977e0175251a63b13850b5681c",
+      "sha256": "fdc1ad802fcb2ca80428163ac93a29347f8dff68d8860d7f5b2dfb2793da94da"
+    },
+    {
+      "path": "src/inspect_robots/logging/rerun_sink.py",
+      "git_blob_sha1": "261fd7bdc021094593095c0f7730cbe1276fba0c",
+      "sha256": "5785b98b9ea9d62c2804367a91ba97056fc2f38720b7994a78f2940e5efe9e70"
+    },
+    {
+      "path": "src/inspect_robots/logging/sink.py",
+      "git_blob_sha1": "ddc418900acd62b796808db22c3bf9b5bd8b57d3",
+      "sha256": "69c74a392c75f35f2988bd306523da525903b9f5a91b4b4ba3f5ba2c7810eb32"
+    },
+    {
+      "path": "src/inspect_robots/mock/__init__.py",
+      "git_blob_sha1": "5f22465490dd666d39cdee5d22b00fb845f784b2",
+      "sha256": "013f73b80987a5c407dfa5f8004254345c0b19728478ce81725120c336ac227e"
+    },
+    {
+      "path": "src/inspect_robots/mock/cubepick.py",
+      "git_blob_sha1": "d9956048547a6e792e0f496db4b921ba10301239",
+      "sha256": "7eca6b141b86c5a45eadd6be71c96616c781691d1d46716f939e7e11e861ac3e"
+    },
+    {
+      "path": "src/inspect_robots/mock/policies.py",
+      "git_blob_sha1": "1c3a74d0b54f24010c785c6eb385efd08820e09d",
+      "sha256": "fe817d5daeb8a2eedcc0869bb2be95d6825fd1cd60f8ab81b293584e5bbd9cd2"
+    },
+    {
+      "path": "src/inspect_robots/benchmark.py",
+      "git_blob_sha1": "b8dd87ff7430452fe235a11cb1361828a7cabd90",
+      "sha256": "3448a65c0a553fa905ca103cac59e77007442a5c4440e11a9fe4de1e3939a9af"
+    },
+    {
+      "path": "LICENSE",
+      "git_blob_sha1": "0b93f8d449d5430dbea7250c961ed8568d3ab283",
+      "sha256": "35a8a6ad98df0f2311f77779adb1f35ac610e14ae756cc6021766e8b65071635"
+    }
+  ]
+}

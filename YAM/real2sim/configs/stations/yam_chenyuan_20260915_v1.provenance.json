@@ -1,0 +1,77 @@
+{
+  "version": "yam_chenyuan_20260915_v1",
+  "sources": {
+    "left_main": {
+      "original_path": "/home/chenyuan/workspace/real2sim/runs/yam_calibration_new_20260915/solve_v1/calib_left_main_new.json",
+      "archived_path": "sources/left_main.json",
+      "sha256": "5c77203488c3d5080daa162a9694c12fe2081d69ef6d368c6892bce6d882dbd0"
+    },
+    "right_main": {
+      "original_path": "/home/chenyuan/workspace/real2sim/runs/yam_right_remount_20260915/solve_v1/pixel_refined.json",
+      "archived_path": "sources/right_main.json",
+      "sha256": "c94ce67ee1ebc0ee7b6a4f1758b4ed2e971bdb0f8c30ca30e3f9a9b52ef374e1"
+    },
+    "left_wrist": {
+      "original_path": "/home/chenyuan/workspace/real2sim/runs/yam_calibration_new_20260915/solve_v1/calib_left_wrist_new.json",
+      "archived_path": "sources/left_wrist.json",
+      "sha256": "2e742a71cfa78e6a3ed9ad011d4e1bd46a2a05c03bf9786bcb3141439641e6be"
+    },
+    "right_wrist": {
+      "original_path": "/home/chenyuan/workspace/real2sim/runs/yam_calibration_new_20260915/solve_v1/calib_right_wrist_new.json",
+      "archived_path": "sources/right_wrist.json",
+      "sha256": "717cd89be8c5c8dcff91ad70a99155f8392e72cfc8f8bd9a5639235971563cda"
+    },
+    "table": {
+      "original_path": "/home/chenyuan/workspace/real2sim/runs/yam_calibration_new_20260915/solve_v1/table_plane_candidate.json",
+      "archived_path": "sources/table.json",
+      "sha256": "4ca70089b34df52f5efbc21d6053e46909b08921ee6012daf851a1ccf2dff283"
+    },
+    "intrinsics": {
+      "original_path": "/home/chenyuan/workspace/real2sim/runs/yam_right_remount_20260915/device_intrinsics.json",
+      "archived_path": "sources/intrinsics.json",
+      "sha256": "9f33e92c66cffd55cb0ef9d6567996d4b9b2e68f1c87e468436d7a1d798c9bd4"
+    }
+  },
+  "acceptance": {
+    "basis": "User confirms measured desk projection distances approximately match; explicitly requests freezing this parameter combination",
+    "scope": [
+      "scene_reconstruction",
+      "placement_guidance"
+    ],
+    "precision_certification": false,
+    "reported_measurements": "approximately matches; exact measured values not supplied"
+  },
+  "expected_table_distances_mm": {
+    "left_base_to_main": 390.3350621394924,
+    "right_base_to_main": 409.2924209019178,
+    "left_to_right_base": 798.3625802535282
+  },
+  "raw_mcap": [
+    {
+      "path": "/mnt/sdb/YAM/data/calib_left_main_new/mcap/success/episode_0001_5779274a3ca441a583cbae30ff1a493d.mcap",
+      "sha256": "4622b334bc66d209ab5b9ff47df0606cbffb4541044b288199371ca1c71bc0b2",
+      "bytes": 85762375
+    },
+    {
+      "path": "/mnt/sdb/YAM/data/calib_left_wrist_new/mcap/success/episode_0001_e08878102e034e7780d3976697c4ead2.mcap",
+      "sha256": "1560bb669174fe4df4f4c4add63e35701fad480f9e80363521e63316aecc8fb2",
+      "bytes": 64880835
+    },
+    {
+      "path": "/mnt/sdb/YAM/data/calib_right_wrist_new/mcap/success/episode_0001_89cd0452c5814422afd7836d5cc6d9f9.mcap",
+      "sha256": "cdcfe574b671903c5f68067334f3a4db35da01573ac576147019f5de224cf02c",
+      "bytes": 55913025
+    },
+    {
+      "path": "/mnt/sdb/YAM/data/calib_table_check_new/mcap/success/episode_0001_160b3c485def411a936e889e13f8ab46.mcap",
+      "sha256": "cd51551452d0fd96a81db88ec7135363dc7c3924f11c9cc9e48e6032eb73d219",
+      "bytes": 25851955
+    },
+    {
+      "path": "/mnt/sdb/YAM/data/calib_right_main_verify/mcap/success/episode_0001_c40240a2732e4bd6888d97ecfd60e0e7.mcap",
+      "sha256": "47ad38fe6ff0cc0a2b09161bc3d0cf33b95f4ae3e3cfb76bdc2236bdbc01ad31",
+      "bytes": 82573144
+    }
+  ],
+  "station_sha256": "e8e0d6beb5c45db3a5473188dbf47988841dab7007759474a3c2faa7071e44f4"
+}

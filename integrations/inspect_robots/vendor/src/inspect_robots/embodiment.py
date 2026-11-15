@@ -1,0 +1,267 @@
+"""The Embodiment interface — Inspect Robots's second swappable input.
+
+An [`Embodiment`][inspect_robots.embodiment.Embodiment] is the "body + world": a real robot or a
+simulator. It
+produces observations, executes actions, and owns the action/observation spaces,
+the native control rate, and reset/safety machinery.
+
+Designed around real-robot reality: ``reset`` may drive to a home pose and block
+on human confirmation; there is no guaranteed privileged success oracle.
+Simulators are a stricter special case that opt into extra ``capabilities``.
+
+Per R1 (see the design doc): ``rollout()`` applies no wall-clock pacing of its
+own — ``step()`` is called as fast as the policy/action_manager/guard can
+produce actions. An embodiment that needs real-time cadence (e.g. matching a
+real robot's control period) paces itself inside ``step()``, and declares the
+``"self_paced"`` capability to document that it does.
+"""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+from inspect_robots.guard import GuardContribution
+from inspect_robots.scene import Scene
+from inspect_robots.spaces import Box, ObservationSpace
+from inspect_robots.types import Action, Observation, StepResult
+
+if TYPE_CHECKING:
+    from inspect_robots.task import TaskEnvelope
+
+# Opt-in capability flags an embodiment may advertise.
+Capability = str
+SEEDABLE: Capability = "seedable"
+RESETTABLE: Capability = "resettable"
+AUTO_RESET: Capability = "auto_reset"
+PRIVILEGED_SUCCESS: Capability = "privileged_success"
+RENDERABLE: Capability = "renderable"
+SELF_PACED: Capability = "self_paced"
+
+
+@dataclass(frozen=True)
+class EmbodimentInfo:
+    """Static description of an embodiment for compatibility checking + logging.
+
+    ``docs`` contains free-form markdown operating notes for policies that can
+    read text, such as joint layout and positive directions, zero-pose
+    geometry, gripper polarity, frame conventions, and workspace hints. Keep
+    it concise because consumers inject it into system prompts verbatim.
+    ``None`` means no notes are offered; consumers must treat empty and
+    whitespace-only strings the same as absence.
+
+    ``morphology`` names the physical platform and its control stack (for
+    example ``"yam-bimanual"``). Two embodiments that share a morphology must
+    offer different policy interfaces, such as joint targets and end-effector
+    targets on the same arms; the conformance kit checks this with
+    [`check_policy_interfaces`][inspect_robots.conformance.check_policy_interfaces].
+    """
+
+    name: str
+    action_space: Box
+    observation_space: ObservationSpace
+    control_hz: float | None = None
+    is_simulated: bool = False
+    capabilities: frozenset[Capability] = field(default_factory=frozenset)
+    # Setup-hook names and target kinds this embodiment can realize (for R7
+    # scene-realizability checks). Empty means "unconstrained" for the tracer.
+    supported_setups: frozenset[str] = field(default_factory=frozenset)
+    supported_target_kinds: frozenset[str] = field(default_factory=frozenset)
+    docs: str | None = None
+    # Environment provenance (e.g. simulator build ID, hardware rig ID).
+    environment_id: str | None = None
+    # Scene/asset revision hash or tag.
+    environment_revision: str | None = None
+    # The physical platform and control stack, shared by every embodiment that
+    # drives the same hardware through a different policy interface.
+    morphology: str | None = None
+
+
+@dataclass(frozen=True)
+class HealthCheck:
+    """One named result in a [`HealthReport`][inspect_robots.embodiment.HealthReport].
+
+    ``detail`` says what was measured or what is wrong, in words an operator
+    can act on (for example ``"no frame for 2.0 s"``).
+    """
+
+    name: str
+    ok: bool
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class HealthReport:
+    """What an embodiment's ``health()`` hook found. Healthy when every check passed.
+
+    An empty report is healthy: an embodiment with nothing to check yet (for
+    example, hardware not connected before the first trial) reports no checks.
+    """
+
+    checks: tuple[HealthCheck, ...] = ()
+
+    @property
+    def ok(self) -> bool:
+        """True when no check failed."""
+        return all(check.ok for check in self.checks)
+
+    @property
+    def failures(self) -> tuple[HealthCheck, ...]:
+        """The checks that failed, in report order."""
+        return tuple(check for check in self.checks if not check.ok)
+
+    def summary(self) -> str:
+        """The failed checks as one line, ``name: detail; ...``, or ``"ok"``."""
+        if self.ok:
+            return "ok"
+        return "; ".join(
+            f"{check.name}: {check.detail}" if check.detail else check.name
+            for check in self.failures
+        )
+
+
+@dataclass(frozen=True)
+class Readiness:
+    """An embodiment's answer to ``prepare_trial(scene)``.
+
+    ``ready=False`` stops the run before the trial starts; ``reason`` is
+    recorded as the run's error, so say what has to change.
+    """
+
+    ready: bool
+    reason: str = ""
+
+
+@runtime_checkable
+class Embodiment(Protocol):
+    """The robot/simulator contract.
+
+    Embodiments may additionally define an **optional** ``bind_task(envelope)``
+    hook (not part of this Protocol, so existing embodiments stay conformant):
+    after compatibility checking, ``eval()`` calls it with the task's resolved
+    [`TaskEnvelope`][inspect_robots.task.TaskEnvelope] before the
+    first reset, letting adapters learn the rollout horizon — e.g. an operator
+    countdown showing elapsed/total. A seconds-based task is converted to
+    integer steps using ``info.control_hz`` before the hook fires. The hook is
+    optional *input*, not a guarantee: it never fires on direct ``rollout()``
+    calls or on older cores, so adapters must keep a graceful fallback. It
+    fires once per ``eval()``, which can be several times over an embodiment's
+    lifetime; each call replaces the previous envelope. ``EmbodimentBase``
+    ships a no-op default.
+
+    Embodiments may additionally offer an optional
+    ``connect_operator_session(session)`` hook. Accepting the session is a
+    stand-down promise for that run: the embodiment must never read stdin or
+    print its own status output after the call. The session provides
+    ``status(line)`` for an in-place status line, ``write_line(text)`` for
+    scrollback that safely repaints that status, and ``gate(prompt, hint=...)``
+    for blocking readiness confirmation. A gate flushes stale fd input first
+    and raises [`EmbodimentFault`][inspect_robots.errors.EmbodimentFault] when
+    stdin is unavailable, with remedies and the embodiment's optional hint.
+    The hook is optional input, not a guarantee. It never fires under
+    ``--no-prompt``, without a TTY, on Windows, from direct ``rollout()`` or
+    ``eval()`` calls, or on older cores. An embodiment must keep a graceful
+    fallback and a working end-of-episode path whenever the hook does not fire.
+    The hook stays outside this Protocol so older embodiments remain
+    conformant.
+
+    Embodiments may additionally offer an optional ``observe_parked()`` hook:
+    when a scored trial is about to be graded, ``eval()`` calls it so the
+    embodiment can move itself to its parked/rest pose and return one fresh
+    [`Observation`][inspect_robots.types.Observation] whose cameras see the
+    scene unobstructed; the vlm grader then judges those final frames instead
+    of the last step's. Returning ``None`` declines (right when parking would
+    alter the state being graded, e.g. a held object). Raising
+    [`SafetyAbort`][inspect_robots.errors.SafetyAbort] or
+    [`EmbodimentFault`][inspect_robots.errors.EmbodimentFault] halts the eval;
+    any other failure degrades to last-step frames with a ``RuntimeWarning``.
+    The hook is optional input, not a guarantee: it never fires on direct
+    ``rollout()`` calls, without a grading hook, or on older cores, and it
+    stays outside this Protocol so older embodiments remain conformant.
+
+    The optional ``defer_operator_end()`` hook is superseded by
+    ``connect_operator_session`` but remains supported. An embodiment that
+    polls stdin for the end-of-episode keypress must stop doing so when called;
+    the framework console owns stdin for that run. Offering this legacy hook
+    is also how a real-hardware embodiment declares itself console-safe to
+    cores and adapters that have not adopted the session hook.
+
+    Embodiments may also define an **optional**
+    ``contribute_guards(self, action_space: Box) -> GuardContribution``
+    hook, likewise omitted from this Protocol so existing implementations
+    remain runtime-conformant. The CLI calls it with the resolved action space
+    and appends its contribution after the generic clamp and delta limiter.
+    Direct ``rollout()`` and programmatic ``eval()`` callers compose their own
+    guards, so the hook is CLI input rather than a universal callback.
+    ``EmbodimentBase`` returns an empty contribution by default.
+
+    **Evaluation interface.** The paper gives an embodiment a policy interface
+    (its spaces, ``reset`` and ``step``) and an evaluation interface that the
+    harness drives between trials. The evaluation interface is four optional
+    hooks, outside this Protocol so existing embodiments stay conformant.
+    ``eval()`` calls whichever are present, in this order around each trial:
+
+    1. ``health() -> HealthReport``: is the platform fit to run? A failed
+       report, or an exception, stops the run before the trial with the
+       report's summary as the error. Nothing has moved yet.
+    2. ``prepare_trial(scene) -> Readiness``: can this scene run now? Not
+       ready stops the run the same way, with the stated reason.
+    3. ``home()``: move to the start pose. An embodiment whose ``reset()``
+       already homes need not offer it. An exception stops the run.
+    4. The trial itself: ``reset()``, then ``step()`` until it ends.
+    5. ``park()``: move to a safe rest pose, holding it, so the scene can be
+       reset by hand. Called after every trial whatever its outcome (after
+       scoring, so the grader sees the final state), except a cancelled one.
+       An exception after a clean trial stops the run; after a trial that
+       already halted the run it is reported as a ``RuntimeWarning``. Parking
+       must be safe to request after a fault, and may decline by returning
+       without moving.
+
+    ``park()`` must not release the hardware; ``close()`` still does that.
+    Direct ``rollout()`` calls never use these hooks.
+    """
+
+    info: EmbodimentInfo
+
+    def reset(self, scene: Scene, *, seed: int | None = None) -> Observation:
+        """Prepare a scene and return its initial observation, using ``seed`` if supported."""
+        ...
+
+    def step(self, action: Action) -> StepResult:
+        """Issue one action. The rollout does not wait for the control period between
+        calls; declare ``"self_paced"`` if this embodiment paces itself to real time.
+        """
+        ...
+
+    def close(self) -> None:
+        """Release hardware, simulator, or transport resources held by the adapter."""
+        ...
+
+
+class EmbodimentBase(ABC):
+    """Optional base class with a no-op ``close``; inherit for the convenience."""
+
+    info: EmbodimentInfo
+
+    @abstractmethod
+    def reset(self, scene: Scene, *, seed: int | None = None) -> Observation:
+        """Prepare a scene and return its initial observation, using ``seed`` if supported."""
+        ...
+
+    @abstractmethod
+    def step(self, action: Action) -> StepResult:
+        """Issue one action. The rollout does not wait for the control period between
+        calls; declare ``"self_paced"`` if this embodiment paces itself to real time.
+        """
+        ...
+
+    def bind_task(self, envelope: TaskEnvelope) -> None:  # noqa: B027 - no-op default
+        """Default: embodiments with nothing to display or pre-allocate ignore it."""
+
+    def contribute_guards(self, action_space: Box) -> GuardContribution:
+        """Default: embodiments without specialized safety gates contribute nothing."""
+        return GuardContribution()
+
+    def close(self) -> None:  # noqa: B027 - intentional no-op default
+        """Default: nothing to release."""

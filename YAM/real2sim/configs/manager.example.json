@@ -1,0 +1,13 @@
+{
+  "station_id": "CHANGE_TO_STATION_ID",
+  "platform": "xtrainer",
+  "task_id": "TASK-X-0001",
+  "calibration_bundle": "runs/task_x_0001_supervision",
+  "registry": "runs/guidance_releases",
+  "utility_python": ".venv/bin/python",
+  "scene": "runs/stack_cups_contact/initial.usda",
+  "task_ids": [
+    "TASK-X-0001",
+    "TASK-X-0003"
+  ]
+}

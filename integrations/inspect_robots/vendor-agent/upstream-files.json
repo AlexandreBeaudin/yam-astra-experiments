@@ -1,0 +1,73 @@
+{
+  "revision": "772019598e42ccc7921a043dee3a2ea2692020ea",
+  "version": "0.30.0",
+  "repository": "https://github.com/robocurve/inspect-robots",
+  "files": [
+    {
+      "path": "plugins/inspect-robots-agent/src/inspect_robots_agent/__init__.py",
+      "name": "__init__.py",
+      "git_blob_sha1": "5fe9599452b13b860afb6dae9e365acc52eb0bb5",
+      "sha256": "04c504b36d1386d36eb89bd55b8196740cdf1c53d299a8c5dbd3d9786d499c83"
+    },
+    {
+      "path": "plugins/inspect-robots-agent/src/inspect_robots_agent/_anthropic.py",
+      "name": "_anthropic.py",
+      "git_blob_sha1": "d5d7dd0dac8aacc3c6d7b19612b225c8c3bc8eb7",
+      "sha256": "61c04c7341e0a1541daeddb75440781ec60e6ea6d88c4179c31d190197864fe9"
+    },
+    {
+      "path": "plugins/inspect-robots-agent/src/inspect_robots_agent/_capture.py",
+      "name": "_capture.py",
+      "git_blob_sha1": "9619dabe25977b058cf23fb0be7ed33d331b0ccb",
+      "sha256": "13833c76d03db5157fa3fe70c3c6034d2c5aee096ba78686e861fd9cbf2af95c"
+    },
+    {
+      "path": "plugins/inspect-robots-agent/src/inspect_robots_agent/_depth.py",
+      "name": "_depth.py",
+      "git_blob_sha1": "abce4f040f8f1446593b43631f3c558df9bd38d9",
+      "sha256": "bddd06d30d808b89bfbd9d9492da9f00b92c6ed06712d000b5f269507b98c939"
+    },
+    {
+      "path": "plugins/inspect-robots-agent/src/inspect_robots_agent/_gemini_live.py",
+      "name": "_gemini_live.py",
+      "git_blob_sha1": "d0e836d9c6925d03bcc8bc3b4cc69cb4a16acaa4",
+      "sha256": "f175e2bb3ef74e111f72c19ca0d93bad6efd680100e531622f036c0dfccb707e"
+    },
+    {
+      "path": "plugins/inspect-robots-agent/src/inspect_robots_agent/_interactions.py",
+      "name": "_interactions.py",
+      "git_blob_sha1": "5d060ef46b5913237d6c48a50725a0ad4fc93d42",
+      "sha256": "43e2f710b4d5c912c0ca63296b9e33a78c82110b5c1a037d565990671d9eaac7"
+    },
+    {
+      "path": "plugins/inspect-robots-agent/src/inspect_robots_agent/_llm.py",
+      "name": "_llm.py",
+      "git_blob_sha1": "a14485f80d9cfb5156b5847f1b51c0428dc02f2e",
+      "sha256": "b0e6c4a708544d20f3ba18d76a844c9d89affd2d93f5d8a228a2ff5fb09728c4"
+    },
+    {
+      "path": "plugins/inspect-robots-agent/src/inspect_robots_agent/_png.py",
+      "name": "_png.py",
+      "git_blob_sha1": "752a758d35780bac24e6dc3e5c828cb9d19a7901",
+      "sha256": "1122b17bc89173df362fc26ffd2719bd3e6258d2f04048c4e92a75b15ebf812b"
+    },
+    {
+      "path": "plugins/inspect-robots-agent/src/inspect_robots_agent/_responses.py",
+      "name": "_responses.py",
+      "git_blob_sha1": "5a608e68345f6075453a62c22dccbd4d258060b5",
+      "sha256": "858c9f08b45af25d271c8da1aa7352918df185407d4a499cbb882ee8c2a9498c"
+    },
+    {
+      "path": "plugins/inspect-robots-agent/src/inspect_robots_agent/policy.py",
+      "name": "policy.py",
+      "git_blob_sha1": "502887ae225c5de60686affdbf11499244796f13",
+      "sha256": "c350852162299ef2cd094235d3a5b9f9b69c3be4db72fcf76593e1e4c858d7a5"
+    },
+    {
+      "path": "plugins/inspect-robots-agent/src/inspect_robots_agent/py.typed",
+      "name": "py.typed",
+      "git_blob_sha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

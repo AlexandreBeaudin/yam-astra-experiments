@@ -1,0 +1,10 @@
+{
+  "schema": "real2sim.simulation_runtime/v1",
+  "simulator": "isaacsim",
+  "version": "5.1.0",
+  "python": "3.11",
+  "environment": ".runtime/isaacsim-5.1",
+  "physics": "PhysX",
+  "platforms": ["xtrainer", "yam"],
+  "note": "Shared simulation/rendering runtime. Collector and offline calibration environments are independent. MuJoCo is permitted for model-only FK/IK, not as a second production simulation backend."
+}

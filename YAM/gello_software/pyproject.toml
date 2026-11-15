@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yam-robot-toolkit"
+version = "0.2.0"
+description = "Internal GELLO teleoperation and data toolkit for the I2RT YAM robot"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = "MIT"
+authors = [{name = "YAM Robotics Team"}]
+dependencies = [
+    "h5py>=3.10",
+    "numpy>=1.26,<3",
+    "Pillow>=10",
+    "PyYAML>=6",
+    "pyzmq>=25",
+    "rich>=13",
+    "termcolor>=2.4",
+    "tyro>=0.8",
+]
+
+[project.optional-dependencies]
+yam = [
+    "dynamixel-sdk>=3.7",
+    "i2rt[yam]==1.1.2",
+    "omegaconf>=2.3,<3",
+    "python-can>=4.5,<5",
+]
+realsense = ["pyrealsense2>=2.55"]
+sim = [
+    "dm-control>=1.0.20",
+    "mujoco>=3.1",
+    "numpy-quaternion>=2023.0.4",
+    "pin>=3.0",
+    "pygame>=2.5",
+    "pyquaternion>=0.9.9",
+]
+ur = ["ur-rtde>=1.5"]
+xarm = ["xarm-python-sdk>=1.14"]
+guidance = ["real2sim-workbench==0.1.0"]
+dev = [
+    "pytest>=8,<9",
+    "build>=1.2",
+    "ruff>=0.9",
+]
+mcap = [
+    "mcap>=1.2,<2",
+    "av>=14,<17",
+]
+platform = [
+    "cryptography>=50.0.2",
+]
+
+[project.scripts]
+yam = "gello.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gello*", "experiments*", "scripts*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+gello = ["py.typed"]
+
+[tool.uv.sources]
+i2rt = {path = "../i2rt", editable = true}
+real2sim-workbench = {path = "../real2sim", editable = true}
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

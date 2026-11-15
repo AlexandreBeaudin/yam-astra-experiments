@@ -1,0 +1,10 @@
+{
+  "endpoint": "https://bj.bcebos.com",
+  "bucket": "replace-with-your-bucket",
+  "prefix": "real2sim",
+  "multipart_threshold_bytes": 67108864,
+  "feishu_writeback": {
+    "enabled": false,
+    "config": "feishu_materials.local.json"
+  }
+}

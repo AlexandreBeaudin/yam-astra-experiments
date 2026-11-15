@@ -1,0 +1,8 @@
+{
+  "platform_id": "yam", "station_id": "yam_chenyuan", "world_frame": "left_base",
+  "calibration_status": "missing",
+  "robot": {"model": "i2rt/i2rt/robot_models/arm/yam/yam.xml", "joint_names": null, "world_T_right_base": null, "tool_transforms": null},
+  "cameras": {"main": {"K": null, "distortion": null, "image_size": [640,480], "world_T_camera": null, "serial": null, "saved_image_rotation_deg": null}},
+  "table": {"z_m": null, "bounds_xy_m": null},
+  "notes": "Template only. Never reuse Xtrainer calibration, tool offsets or workspace bounds."
+}

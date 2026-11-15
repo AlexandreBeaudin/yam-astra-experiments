@@ -1,0 +1,32 @@
+Task: Execute one pick-and-place episode on YAM3 using ONLY the logical right arm (`right_j0`..`right_j5`, `right_gripper`) to pick up the pink block and place it fully inside the white paper marked X. Keep the left arm strictly at its initial pose. Never home or park.
+
+Available Control & Hardware Limits:
+- Control mode: `move_joints` (absolute joint targets in radians; `right_gripper`: `1.0` = open, `0.0` = closed).
+- Per-call motion limits: up to `0.45 rad` delta per arm joint (`right_j0`..`right_j5`) in clear workspace, and up to `1.0` delta on `right_gripper` (full open or close in a single call).
+- Observations: `main` (3rd-person table view), `right` (right-wrist eye-in-hand view), `left` (left-wrist view), and `main_comparison` (previous/current `main` crop).
+
+YAM3 Right-Arm Kinematic Priors (Robot Hardware Geometry):
+- `right_j0` (Base yaw): Increasing (`+`) sweeps the right arm inward/left across the table; decreasing (`-`) sweeps outward/right.
+- `right_j1` (Shoulder) + `right_j2` (Elbow): Increasing both together (`+j1`, `+j2` at ~1:1) extends reach radially outward across the table at roughly constant height. Increasing `+j1` while holding or slightly decreasing `j2` lowers the fingertips toward the table; decreasing `-j1` while increasing `+j2` lifts them.
+- `right_j3` (Wrist pitch): Decreasing (`-`) pitches the gripper and wrist camera downward toward the table (`j3 ≈ -0.60` points the fingers vertically downward).
+- `right_j4` & `right_j5` (Wrist roll/flange): Keep `right_j4` and `right_j5` near their initial neutral angles (`~ -0.03`, `~ -0.07`). The neutral jaw orientation is already level with the table and parallel to the table axes; rotating `j5` when pitched downward tilts one finger lower than the other. Only rotate `j5` if the block is visibly skewed by >25° relative to the table grid.
+
+Execution Policy (Closed-Loop Visual & Proprioceptive Control):
+1. Coupled Moves: Combine active joints (`j0`, `j1`, `j2`, `j3`) simultaneously (`0.25–0.45 rad` per active joint in clear space; `0.10–0.18 rad` during descent) whenever clear space is visible in `main`. Only use fine steps (`0.02–0.05 rad`) during final XY centering right above the target.
+2. Judging Depth Before Closing (`main` + `right` Views):
+   - Because `main` views the table at an angle, fingertips that are still several centimeters above the block can visually overlap its top face.
+   - Do NOT close `right_gripper` until BOTH: (a) `right` view shows the pink block centered between the open finger pads, AND (b) `main` view clearly shows the black fingertips have descended BELOW the block's top face so the pads straddle the lower half of the block near the tablecloth surface.
+3. Closed-Loop Recovery After a Missed Grasp:
+   - A secure grasp stalls `right_gripper` around `0.45–0.65`. If `right_gripper: 0.0` closes to `< 0.10`, the jaws were too high and missed or only clipped the top edge.
+   - Immediately reopen (`right_gripper: 1.0`). If the jaws closed in empty air above the block, make a decisive downward step (`+0.12` to `+0.18 rad` on `right_j1`) before closing again. If reopening nudged or shifted the block, lift slightly (`-0.08 rad` on `j1`), re-center over the block's new position in `right` view, descend lower, and grasp again.
+4. Table-Contact & Early-Release Safety During Placement:
+   - After every move, compare `measured` vs commanded `targets`. If `measured` lags behind `targets` by `> 0.015 rad` on `j1`/`j2` OR `j3` deflects upward, the arm/block has contacted the table—NEVER command further downward motion.
+   - When placing the held block onto the white paper marked X, center it over X in `right` view and lower until `main` shows the bottom of the pink block touching or within ~1–2 cm of the paper surface, then immediately open `right_gripper: 1.0` in one call. Never press the block into the table.
+5. Lift & Post-Release Verification:
+   - After grasping, lift `~6–8 cm` (`-j1`, `+j2`) to confirm the block clears the table before moving laterally toward the paper.
+   - After releasing on the paper, retract upward `~10 cm` (`-j1`, `+j2`), verify in `main` that the entire pink block rests inside the white paper, and call `done`.
+
+Guards & Failure Handling:
+- Nudging or shifting the foam block is normal and recoverable—NEVER call `give_up` because the block moved on the table.
+- Only call `give_up` if a hardware/CAN fault occurs, a safety guard blocks all recovery directions, or the block is knocked completely out of reach.
+- In `note`, write 1–2 concise sentences: `[Stage X] Visual alignment in main/right -> Coupled joint delta & purpose`.

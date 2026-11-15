@@ -1,0 +1,3 @@
+# Compatibility entry point for tools that still consume requirements files.
+# Dependency versions and optional hardware stacks are defined in pyproject.toml.
+.[yam,realsense,sim,ur,xarm]

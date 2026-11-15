@@ -1,0 +1,11 @@
+{
+  "platform": "yam",
+  "station_id": "rhos-nuc-1",
+  "task_ids": [
+    "TASK-YAM-EXAMPLE"
+  ],
+  "calibration_bundle": "/absolute/path/to/accepted-yam-bundle",
+  "registry": "~/.local/share/yam/guidance-releases",
+  "task_id": "TASK-YAM-EXAMPLE",
+  "utility_python": "/absolute/path/to/YAM/real2sim/.venv/bin/python"
+}

@@ -1,0 +1,19 @@
+# Experimental tracking gains 2026-11-12; backups: .before-large-motion-20261112 and .before-20261112
+motor_list:
+  - [0x01, "DM4340"]
+  - [0x02, "DM4340"]
+  - [0x03, "DM4340"]
+  - [0x04, "DM4310"]
+  - [0x05, "DM4310"]
+  - [0x06, "DM4310"]
+
+directions: [1, 1, 1, 1, 1, 1]
+
+kp: [300.0, 450.0, 450.0, 120.0, 30.0, 30.0]
+kd: [6.0, 6.0, 6.0, 1.8, 1.8, 1.8]
+
+gravity_comp_factor: [1.0, 1.1, 1.1, 1.2, 1.0, 1.0]
+
+grav_comp_kd: [0.1, 0.1, 0.1, 0.3, 0.05, 0.05]
+
+coulomb_friction: [0.3, 0.3, 0.3, 0.06, 0.06, 0.06]

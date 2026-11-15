@@ -1,0 +1,36 @@
+cameras:
+  main:
+    serial: "REPLACE_WITH_MAIN_SERIAL"
+    model: D435
+    width: 640
+    height: 480
+    fps: 30
+    rotation: 0
+    auto_exposure: false
+    exposure_us: 8500
+  left:
+    serial: "REPLACE_WITH_LEFT_SERIAL"
+    model: D405
+    width: 640
+    height: 480
+    fps: 30
+    rotation: 0
+    auto_exposure: false
+    exposure_us: 10000
+  right:
+    serial: "REPLACE_WITH_RIGHT_SERIAL"
+    model: D405
+    width: 640
+    height: 480
+    fps: 30
+    rotation: 0
+    auto_exposure: false
+    exposure_us: 10000
+
+depth:
+  default_enabled: false
+
+sync:
+  max_skew_ms: 25
+  max_frame_age_ms: 100
+  max_consecutive_failures: 10
