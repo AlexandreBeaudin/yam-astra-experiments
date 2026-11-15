@@ -117,7 +117,9 @@ def scenario(decision, left, bounds, delta, phase, verdict):
         assert len(arm._approved_path) == len(actions)
         # Dispatch rejects a changed waypoint before the disabled RPC.
         changed = actions[0].data.copy()
-        changed[0] += .00001
+        # Perturb an inactive axis so this tests path identity, not the
+        # independent per-step guard when J0 already uses its full allowance.
+        changed[1] += .00001
         try:
             arm.step(run.Action(data=changed))
         except run.SafetyAbort:
@@ -143,13 +145,13 @@ def main():
             ('final_approach_large', decisions[-1], .20, 'alignment', True),
             ('final_approach_fine', decisions[-1], .02, 'alignment', True),
             ('unsafe_path', decisions[0], .20, 'open_space_approach', False),
-            ('over_candidate_cap', decisions[0], .45001, 'open_space_approach', True),
+            ('over_candidate_cap', decisions[0], .80001, 'open_space_approach', True),
             ('out_of_bounds', decisions[0], 4., 'open_space_approach', True),
         ]:
             cases[name] = scenario(decision, left, bounds, delta, phase, verdict)
         assert cases['open_space_contract']['accepted']
-        assert cases['open_space_contract']['effective_cap_rad'] == .45
-        assert cases['final_approach_large']['effective_cap_rad'] == .45
+        assert cases['open_space_contract']['effective_cap_rad'] == .80
+        assert cases['final_approach_large']['effective_cap_rad'] == .80
         assert cases['final_approach_large']['accepted']
         assert cases['run007_unknown_clearance']['accepted']
         assert cases['final_approach_fine']['accepted']
@@ -158,7 +160,7 @@ def main():
             assert not cases[name]['accepted'], name
     assert archive_manifest() == before, 'Run 007 archive changed'
     (OUTPUT / 'archive-sha256.json').write_text(json.dumps(before, indent=2) + '\n')
-    report = dict(candidate_cap_rad=.45, saved_evidence_effective_cap_rad=.45,
+    report = dict(candidate_cap_rad=.80, saved_evidence_effective_cap_rad=.80,
                   physical_clearance_verified=False, archive_unchanged=True,
                   dispatches=0, astra_calls=0, cases=cases)
     (OUTPUT / 'results.json').write_text(json.dumps(report, indent=2) + '\n')

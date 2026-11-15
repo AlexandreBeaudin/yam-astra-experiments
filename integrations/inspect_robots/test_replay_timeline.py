@@ -38,6 +38,16 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(p['effort'],'medium')
         self.assertEqual(p['title'],'Pink block pick-and-place')
 
+    def test_wrist_continuous_stream_is_separate_from_decision_snapshots(self):
+        d=self.fixture()
+        d['frames'].extend([
+            dict(camera='right', source='preview_recording', time_s=.2, image='live-right.jpg'),
+            dict(camera='right', source='preview_recording', time_s=2.4, image=None)])
+        p=build_timeline(d)
+        self.assertEqual(p['right'],[{'time_s':.2,'image':'live-right.jpg'}, {'time_s':2.4,'image':None}])
+        self.assertEqual(p['decisions'][0]['images']['right'],'right.jpg')
+        self.assertEqual(build_timeline({})['right'],[])
+
     def test_failed_call_does_not_steal_next_response(self):
         d=self.fixture()
         d['calls'].reverse()

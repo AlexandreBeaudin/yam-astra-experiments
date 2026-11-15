@@ -27,7 +27,7 @@ class ApproachTests(unittest.TestCase):
                     result = scenario(self.decisions[-1], self.left, self.bounds,
                                       .20, phase, True)
                     self.assertTrue(result['accepted'])
-                    self.assertEqual(result['effective_cap_rad'], .45)
+                    self.assertEqual(result['effective_cap_rad'], .80)
                     self.assertEqual(result['checker_calls'], 0)
 
     def test_default_cap_and_explicit_checker_rejection(self):
@@ -47,7 +47,7 @@ class ApproachTests(unittest.TestCase):
             policy.bind(arm.info)
             schema = next(t for t in policy._adapter.tools.schemas()
                           if t['function']['name'] == 'move_joints')['function']
-            self.assertIn('0.45', schema['description'])
+            self.assertIn('0.80', schema['description'])
             self.assertIn('1.0', schema['description'])
             self.assertEqual(schema['parameters']['properties']['phase']['enum'],
                              list(run.MOTION_PHASES))

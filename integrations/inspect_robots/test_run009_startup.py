@@ -61,7 +61,7 @@ class Run009StartupTests(unittest.TestCase):
             self.assertNotIn('Use move_gripper_to_pose', instructions)
             self.assertNotIn('legacy diagnostic', instructions)
             self.assertIn('Control mode: move_joints', instructions)
-            self.assertIn('Effective cap: 0.45', (Path(temp) / 'observation-report.txt').read_text())
+            self.assertIn('Effective cap: 0.8', (Path(temp) / 'observation-report.txt').read_text())
 
 
 if __name__ == '__main__':

@@ -71,23 +71,67 @@ MODEL_ATTEMPTS = 4  # Total attempts, including the first request.
 MAX_CALLS = 180
 MAX_SECONDS = 2400
 MAX_STEPS = 5400
-MAX_MOVE_RAD = 0.45  # Per-call ceiling; use fine steps near contact. Interpolation unchanged.
+MAX_MOVE_RAD = 0.80  # Per-call ceiling; use fine steps near contact. Interpolation unchanged.
 MAX_GRIPPER_DELTA = 1.0
-APPROACH_MOVE_RAD = 0.45  # Optional attended path review uses the same ceiling.
+APPROACH_MOVE_RAD = 0.80  # Optional attended path review uses the same ceiling.
 MOTION_PHASES = ('open_space_approach', 'alignment', 'descent', 'grasp', 'placement', 'fine')
 OBSERVATION_GUIDANCE = (
-    'Use main for height above the table and right for XY alignment; left is also '
-    'delivered. main_comparison shows previous/current main crops. '
-    'Use fresh observations after each move. Stop on unexpected contact or guard trips.'
+    'Use right for approach depth relative to the finger pads and XY centering; '
+    'use main for overall table/arm clearance. '
+    'main_comparison shows previous/current main crops. '
+    'Use fresh observations after each move. On possible contact stop descent, '
+    'then assess a small upward withdrawal or reversal with clear space and valid feedback. '
+    'Recoverable contact alone is not a reason to give_up. Never bypass guard trips.'
 )
 MOVE_DESCRIPTION = (
-    ' Per-call ceiling: 0.45 rad per arm joint and 1.0 normalized gripper. '
-    'In visibly clear workspace, combine active axes in 0.25–0.45 rad transit moves. '
-    'Use 0.03–0.06 rad for terminal alignment near the block/table. '
+    ' Per-call ceiling: 0.80 rad per arm joint and 1.0 normalized gripper. '
+    'In visibly clear workspace, combine active axes in 0.40–0.80 rad transit moves. '
+    'Use 0.10–0.20 rad during descent and 0.02–0.05 rad for final XY centering. '
     'Absolute named targets; omitted joints retain their current target. '
     + OBSERVATION_GUIDANCE
 )
 
+
+
+USB_OBSERVATION_GUIDANCE = (
+    'Use main for overall layout and clearance; use right for finger-pad depth, '
+    'plug orientation and port alignment. Check fresh images and measured joints after each move. '
+    'On binding, hub motion or possible contact, stop advancing; assess a clear, '
+    'guard-permitted back-out before revising alignment, grasp or port. Never bypass hardware guards.'
+)
+USB_MOVE_DESCRIPTION = (
+    ' Absolute named right-arm targets; omitted joints retain their current target. '
+    'Per-call ceiling: 0.80 rad per arm joint and 1.0 normalized gripper. '
+    'Large coupled moves are for clear free-space transit only. Near the hub, '
+    'align keyed plug orientation first and use small observed moves along the insertion axis. '
+    + USB_OBSERVATION_GUIDANCE
+)
+
+
+def task_configuration(task_id='pick-place'):
+    if task_id == 'usb-insertion':
+        root = HERE / 'experiments/usb-insertion'
+        return dict(id=task_id, prompt=root / 'prompt.txt', output_root=root / 'runs',
+            output_prefix='run-', scene_id='yam3-usb-insertion-one-episode',
+            task_name='yam3-usb-insertion', title='USB-A cable insertion', instruction=
+            "Use only YAM3's logical right arm to pick up the loose cable and fully seat its "
+            "USB-A plug in any one of the four ports on the hub. Leave the plug seated with "
+            "the gripper clear. Keep the left arm at its initial pose.")
+    if task_id != 'pick-place':
+        raise ValueError(f'Unknown task: {task_id}')
+    return dict(id=task_id, prompt=PROMPT, output_root=HERE, output_prefix='astra-yam3-run-',
+        scene_id='yam3-astra-one-episode', task_name='yam3-astra-gradual-spatial-exploration',
+        title='Pink block pick-and-place', instruction=
+        'Use the right arm to place the pink block centered on the black X on the white paper, '
+        'then return to its initial resting pose before calling done.')
+
+
+def validate_resume_task(source, task_id):
+    manifest = Path(source) / 'attempt.json'
+    saved = json.loads(manifest.read_text()).get('task_id', 'pick-place') if manifest.exists() else 'pick-place'
+    if saved != task_id:
+        raise ValueError(f'Resume task mismatch: saved {saved}, selected {task_id}. '
+                         'Use the matching --task; never carry task history into another experiment.')
 
 
 def station_motion_tools(library, arm):
@@ -96,19 +140,26 @@ def station_motion_tools(library, arm):
     for tool in library:
         if tool.name == 'give_up':
             schema = copy.deepcopy(tool.schema)
-            schema['function']['description'] += ' ' + OBSERVATION_GUIDANCE
+            schema['function']['description'] += ' ' + arm.observation_guidance()
             schema['function']['parameters']['properties']['reason']['description'] = (
                 'State the exact blocking uncertainty or guard and blocked next action; '
                 'explain why delivered views, feedback, previous moves and safe alternatives '
                 'cannot support progress. Missing side imagery or pose-tool prerequisites alone '
-                'are not blockers while another supported action is available.')
+                'are not blockers while another supported action is available. '
+                'For contact, explain why a small upward withdrawal or reversal cannot '
+                'safely separate the pad before re-centering. Contact alone is not terminal; '
+                'all hardware guards remain authoritative.')
+            if arm.task_id == 'usb-insertion':
+                reason = schema['function']['parameters']['properties']['reason']
+                reason['description'] = reason['description'].replace(
+                    'small upward withdrawal or reversal', 'clear insertion-axis back-out or reversal')
             tools.append(replace(tool, schema=schema))
             continue
         if tool.name != 'move_joints':
             tools.append(tool)
             continue
         schema = copy.deepcopy(tool.schema)
-        schema['function']['description'] += MOVE_DESCRIPTION + ' Current station allowance: ' + arm.motion_allowance()
+        schema['function']['description'] += (USB_MOVE_DESCRIPTION if arm.task_id == 'usb-insertion' else MOVE_DESCRIPTION) + ' Current station allowance: ' + arm.motion_allowance()
         schema['function']['parameters']['properties']['phase'] = {
             'type': 'string', 'enum': list(MOTION_PHASES),
             'description': 'Optional stage label; all phases share the per-call ceiling.'}
@@ -258,12 +309,12 @@ class GatewayTransport(httpx.BaseTransport):
 
 
 def make_policy(transport, pre_check, *, env=None, station=None, resume_state=None,
-                timeout_s=MODEL_TIMEOUT_S, model_attempts=MODEL_ATTEMPTS):
+                timeout_s=MODEL_TIMEOUT_S, model_attempts=MODEL_ATTEMPTS, prompt_path=None):
     policy = StationPolicy(station=station, resume_state=resume_state, model='gpt-6-astra', base_url='https://api.rhos.cc/v1',
         api_key_env='RHOS_API_KEY', wire='responses', effort='medium',
         max_llm_calls=MAX_CALLS, max_retries=model_attempts, timeout_s=timeout_s,
         images='always', image_horizon=3, depth='off', max_speed_frac=0.1,
-        eval_notes=PROMPT.read_text(), transport=transport, pre_check=pre_check,
+        eval_notes=(prompt_path or PROMPT).read_text(), transport=transport, pre_check=pre_check,
         transcript_echo=True, env=env)
     # The pinned plugin enables optional explicit cache extensions for GPT-6.
     # RHOS has only been exercised with standard Responses fields here. Keep
@@ -293,7 +344,8 @@ class StationArm:
     Injected RPC/preview objects make the actual adapter testable without sockets.
     reset is observational: it never homes, calibrates or parks either arm.
     """
-    def __init__(self, robot, preview, status, *, session=None, deadline=None, simulated=False, path_clearance_check=None, pose_planner=None, pose_inputs_available=False):
+    def __init__(self, robot, preview, status, *, session=None, deadline=None, simulated=False, path_clearance_check=None, pose_planner=None, pose_inputs_available=False, task_id='pick-place'):
+        self.task_id = task_id
         self.robot, self.preview, self.session = robot, preview, session
         self.deadline = deadline
         # Trusted integration only, never model text/meta. Must verify the
@@ -330,7 +382,10 @@ class StationArm:
                 'Left has no exposed action dimensions. No camera calibration. '
                 'Preview acquisition times/IDs unknown. Only supervised visual exploration. '
                 'Pose frame is right_base; nominal grasp_site is not a calibrated physical TCP. '
-                'Never invent a block/paper pose from pixels.',
+                'Never invent a block/paper pose from pixels.' if task_id == 'pick-place' else
+                'Right joints J0-J5 in radians; right_gripper normalized 1=open, 0=closed. '
+                'Left has no exposed action dimensions. No camera calibration. '
+                'Never invent a plug or port pose from pixels.',
             environment_id='YAM3', morphology='yam-pro-existing-safety-daemon')
         self.events = []
         self.last = None
@@ -447,14 +502,21 @@ class StationArm:
             target=self.last.copy(), camera_meta=fresh.extra['cameras'], hashes={v: fresh.extra['cameras'][v]['sha256'] for v in ('main', 'left', 'right')})
         return replace(fresh, images=images, extra=extra)
 
+    def observation_guidance(self):
+        return USB_OBSERVATION_GUIDANCE if self.task_id == 'usb-insertion' else OBSERVATION_GUIDANCE
+
     def action_guidance(self):
+        if self.task_id == 'usb-insertion':
+            return USB_MOVE_DESCRIPTION.strip()
         if pose_tool_available(self):
             return ('Use move_gripper_to_pose for grounded goal-level travel; local IK and timing '
                     'generate waypoints, subject to trusted whole-path clearance checks. '
                     'Use set_gripper for closure/release. ' + OBSERVATION_GUIDANCE)
         return ('Control mode: move_joints, absolute named right-arm targets in radians; '
                 'right_gripper 1=open, 0=closed; full open or close in one call '
-                f'(maximum delta {MAX_GRIPPER_DELTA:.1f}). ' + OBSERVATION_GUIDANCE)
+                f'(maximum delta {MAX_GRIPPER_DELTA:.1f}). '
+                f'Arm per-call ceiling {MAX_MOVE_RAD:.2f} rad/joint in clear space; '
+                'use 0.10–0.20 rad descent and 0.02–0.05 rad final XY steps. ' + OBSERVATION_GUIDANCE)
 
     def motion_allowance(self):
         approval = self.verified_approach
@@ -572,7 +634,7 @@ class StationArm:
                 freshness=camera_freshness(acquisition, frame_id, wall))
         measured = checked_vector(sample['position'], (7,))
         report = {'lines': [
-            OBSERVATION_GUIDANCE,
+            self.observation_guidance(),
             self.motion_allowance(),
             'Camera source metadata: ' + json.dumps(camera_meta),
             'Camera images are preview receive-time-only; exposure freshness is unverified.',
@@ -580,7 +642,9 @@ class StationArm:
             'Visible displacement: requires comparison of main/left/right views; unknown until reviewed.',
             'Camera freshness: unknown for receive-time-only previews; JPEG change does not prove freshness.',
             'Guard intervention: any modification pauses motion for review, independently of station acceptance.',
-            'Pre-grasp: establish approach direction, relative depth, finger alignment and swept clearance from supported observations before descent or closure. Grasp examples, calibration and routine supervisor review are optional.',
+            ('Pre-grasp: establish approach direction, relative depth, finger alignment and swept clearance from supported observations before descent or closure. Grasp examples, calibration and routine supervisor review are optional.'
+             if self.task_id == 'pick-place' else
+             'Grasp the plug housing with its metal tip exposed. Confirm visual lift before approaching the hub; align the tip and keyed orientation before small insertion-axis moves.'),
             'For plausible settling/frame delivery issues, use observation_recheck (at most two per motion). For geometric ambiguity, consider a different informative bounded probe with supported clearance. Missing metadata or one inconclusive recheck alone does not require stopping.',
             f'Measured arm residual maximum: {float(np.max(np.abs(measured[:6] - self.last[:6]))):.5f} rad.',
         ]}
@@ -666,7 +730,7 @@ def attended_approach_check(arm, target, directory):
     delta = np.abs(target - arm.last)
     if (np.max(delta[:6]) <= 0 or np.max(delta[:6]) > APPROACH_MOVE_RAD + 1e-9
             or target[6] != arm.last[6]):
-        raise ValueError('review target must change an arm joint by >0 and <=0.45 rad; keep gripper fixed')
+        raise ValueError('review target must change an arm joint by >0 and <=0.80 rad; keep gripper fixed')
     captured = []
     def capture(points):
         captured.append(np.vstack((arm.last, points)))
@@ -734,12 +798,12 @@ class UnverifiedScorer:
         return Score(None, 'Operator must inspect post-release frames; model done is not independent success.')
 
 
-def execute(policy, arm, output):
-    scene = Scene(id='yam3-astra-one-episode', instruction=
-        'Use the right arm to place the pink block fully inside the white paper marked X.',
+def execute(policy, arm, output, *, task_spec=None):
+    spec = task_spec or task_configuration()
+    scene = Scene(id=spec['scene_id'], instruction=spec['instruction'],
         metadata={'geometry_verified': False, 'calibration_required': False,
-                  'grasp_example_required': False, 'episodes': 1})
-    task = Task(name='yam3-astra-gradual-spatial-exploration', scenes=[scene],
+                  'grasp_example_required': False, 'episodes': 1, 'task_id': spec['id']})
+    task = Task(name=spec['task_name'], scenes=[scene],
                 epochs=1, max_steps=MAX_STEPS - (getattr(arm, 'resume_state', None) or {}).get('step', 0), scorer=UnverifiedScorer())
     if arm.journal is None:
         arm.journal = EvidenceJournal(output)
@@ -769,6 +833,8 @@ def configuration():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--task', choices=['pick-place', 'usb-insertion'], default='pick-place',
+        help='Task prompt, goal and recording namespace (default: pick-place)')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--check-station', action='store_true')
     mode.add_argument('--run', action='store_true')
@@ -793,8 +859,15 @@ def main():
         parser.error('--attempt must be a positive integer')
     if not np.isfinite(args.model_timeout) or args.model_timeout <= 0 or args.model_attempts < 1:
         parser.error('model timeout and attempts must be positive')
+    spec = task_configuration(args.task)
+    prompt_path = spec['prompt']
+    if args.resume:
+        try:
+            validate_resume_task(args.resume, args.task)
+        except ValueError as exc:
+            parser.error(str(exc))
     resume_state = load_resume(args.resume) if args.resume else None
-    output = HERE / f'astra-yam3-run-{args.attempt:03d}'
+    output = spec['output_root'] / f"{spec['output_prefix']}{args.attempt:03d}"
     if args.resume:
         output = args.resume.resolve() / ('resume-' + time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8])
     profile, configs, channels = configuration()
@@ -804,7 +877,8 @@ def main():
         recovered_calls=resume_state['calls_used'] if resume_state else 0, max_seconds=MAX_SECONDS,
         effective_cap_rad=MAX_MOVE_RAD, attended_verified_path_cap_rad=APPROACH_MOVE_RAD,
         max_gripper_delta=MAX_GRIPPER_DELTA,
-        prompt_path=str(PROMPT), prompt_sha256=hashlib.sha256(PROMPT.read_bytes()).hexdigest(),
+        task_id=spec['id'], instruction=spec['instruction'],
+        prompt_path=str(prompt_path), prompt_sha256=hashlib.sha256(prompt_path.read_bytes()).hexdigest(),
         max_steps=MAX_STEPS, output=str(output),
         calibration_required=False, grasp_example_required=False,
         channels=channels, attempt_already_consumed=output.exists(),
@@ -841,7 +915,7 @@ def main():
             raise RuntimeError('existing daemon must be in confirmed SAFE HOLD')
         preview = observer_module().PreviewClient()
         preview.bootstrap(1.)
-        arm = StationArm(robot, preview, status)
+        arm = StationArm(robot, preview, status, task_id=args.task)
         arm.reset(Scene(id='preflight', instruction='Observe only'))
         if resume_state:
             comparison = validate_pose(resume_state, robot.get_joint_state())
@@ -854,19 +928,20 @@ def main():
         if not args.run:
             return
         try:
-            output.mkdir(exist_ok=False)  # Exclusive segment latch; original evidence is preserved.
+            output.mkdir(parents=True, exist_ok=False)  # Exclusive segment latch; original evidence is preserved.
         except FileExistsError:
             parser.error(f'attempt already consumed: {output}; no episode started')
         deadline = time.monotonic() + MAX_SECONDS
         (output / 'attempt.json').write_text(json.dumps(dict(
             started_time_ns=time.time_ns(), channels=channels,
-            prompt_sha256=hashlib.sha256(PROMPT.read_bytes()).hexdigest(),
+            task_id=spec['id'], instruction=spec['instruction'], replay_title=spec['title'],
+            prompt_sha256=hashlib.sha256(prompt_path.read_bytes()).hexdigest(),
             runner_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             max_llm_calls=MAX_CALLS, max_seconds=MAX_SECONDS, max_steps=MAX_STEPS,
             model_timeout_s=args.model_timeout, model_attempts=args.model_attempts,
             resume_source=resume_state['source'] if resume_state else None,
             calibration_required=False, grasp_example_required=False), indent=2))
-        (output / 'prompt.txt').write_bytes(PROMPT.read_bytes())
+        (output / 'prompt.txt').write_bytes(prompt_path.read_bytes())
         transport = GatewayTransport(deadline=deadline)
         if resume_state:
             transport.calls = resume_state['http_attempts']
@@ -874,7 +949,7 @@ def main():
         arm.deadline = deadline
         transport.check = arm.check_model_wait
         policy = make_policy(transport, arm.pre_check, station=arm, resume_state=resume_state,
-                             timeout_s=args.model_timeout, model_attempts=args.model_attempts)
+                             timeout_s=args.model_timeout, model_attempts=args.model_attempts, prompt_path=prompt_path)
         install_checkpoint(policy, arm, output, transport)
         if resume_state:
             atomic_json(output / 'resume-source.json', dict(source=resume_state['source'],
@@ -893,7 +968,7 @@ def main():
             with SupervisedMotionSession(safety, uuid.uuid4().hex,
                     operation='astra-yam3-one-episode') as session:
                 arm.session = session
-                log = execute(policy, arm, output)
+                log = execute(policy, arm, output, task_spec=spec)
                 if log.status != 'success':
                     raise RuntimeError('evaluation failed; preserved checkpoint may be resumed: ' +
                                        str(log.to_dict().get('error')))
@@ -915,7 +990,7 @@ def main():
                 final_hold_confirmed=bool(session and session.held),
                 ended_time_ns=time.time_ns()), indent=2))
             try:
-                print(f'Replay saved: {export_replay(output)}', flush=True)
+                print(f'Replay saved: {export_replay(output, title=spec["title"])}', flush=True)
             except Exception as exc:
                 # Export failures must not hide the episode error or its hold result.
                 print(f'Replay export failed ({type(exc).__name__}); rebuild offline with '

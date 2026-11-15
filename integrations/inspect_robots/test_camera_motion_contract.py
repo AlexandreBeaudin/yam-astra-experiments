@@ -41,7 +41,7 @@ class CameraMotionContractTests(unittest.TestCase):
         self.arm.rechecks = 2
         feedback = policy._recheck({'note': 'inconclusive geometry'}, self.observation).error
         target = self.arm.last.copy()
-        target[0] += .45001
+        target[0] += .80001
         rejection = self.arm.pre_check([target])
         schemas = policy._adapter.tools.schemas()
         surfaces = [run.PROMPT.read_text(), json.dumps(schemas), feedback, rejection,
@@ -49,9 +49,9 @@ class CameraMotionContractTests(unittest.TestCase):
         for text in surfaces:
             self.assert_no_unavailable_requests(text)
         self.assertIn('does not itself require stopping', feedback)
-        self.assertIn('maximum 0.45 rad/joint and 1.00 gripper', rejection)
-        self.assertIn('Control mode: `move_joints`', surfaces[0])
-        self.assertIn('Closed-Loop Visual & Proprioceptive Control', surfaces[0])
+        self.assertIn('maximum 0.8 rad/joint and 1.00 gripper', rejection)
+        self.assertIn('Tool: `move_joints`', surfaces[0])
+        self.assertIn('Execution Policy:', surfaces[0])
         names = {s['function']['name'] for s in schemas}
         self.assertIn('move_joints', names)
         self.assertFalse({'move_gripper_to_pose', 'set_gripper'} & names)
@@ -73,7 +73,7 @@ class CameraMotionContractTests(unittest.TestCase):
                 self.assertIn('does not itself require stopping', json.dumps(body))
                 name, args = 'move_joints', {'targets': {'right_j0': .12},
                     'phase': 'open_space_approach',
-                    'note': 'Prior motion supports this direction; per-call guard caps magnitude at 0.45.'}
+                    'note': 'Prior motion supports this direction; per-call guard caps magnitude at 0.80.'}
             return httpx.Response(200, json={'status': 'completed', 'output': [{
                 'type': 'function_call', 'call_id': str(len(bodies)),
                 'name': name, 'arguments': json.dumps(args)}]})
@@ -88,14 +88,14 @@ class CameraMotionContractTests(unittest.TestCase):
     def test_coarse_boundaries_preserve_clearance_and_fine_guards(self):
         from offline_run007_approach import replay_inputs, scenario
         decisions, left, bounds = replay_inputs()
-        for delta in (.45, .60, .60001):
+        for delta in (.60, .80, .80001):
             for verdict in (True, False, None, 'absent'):
                 with self.subTest(delta=delta, verdict=verdict):
                     result = scenario(decisions[0], left, bounds, delta,
                                       'open_space_approach', verdict)
-                    self.assertEqual(result['accepted'], verdict is not False and delta <= .45)
+                    self.assertEqual(result['accepted'], verdict is not False and delta <= .80)
                     self.assertEqual(result['dispatches'], 0)
         for phase in run.MOTION_PHASES[1:]:
-            result = scenario(decisions[0], left, bounds, .45, phase, True)
+            result = scenario(decisions[0], left, bounds, .80, phase, True)
             self.assertTrue(result['accepted'])
-            self.assertEqual(result['effective_cap_rad'], .45)
+            self.assertEqual(result['effective_cap_rad'], .80)

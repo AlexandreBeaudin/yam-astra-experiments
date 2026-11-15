@@ -1,0 +1,30 @@
+[
+  {
+    "run": "integrations/inspect_robots/astra-yam3-run-013",
+    "boundaries": 60,
+    "errors": [],
+    "dual_camera": "passed",
+    "viewport": "1600x1080"
+  },
+  {
+    "run": "integrations/inspect_robots/astra-yam3-run-015",
+    "boundaries": 42,
+    "errors": [],
+    "dual_camera": "passed",
+    "viewport": "1600x1080"
+  },
+  {
+    "run": "integrations/inspect_robots/experiments/usb-insertion/runs/run-001",
+    "boundaries": 16,
+    "errors": [],
+    "dual_camera": "passed",
+    "viewport": "1600x1080"
+  },
+  {
+    "run": "integrations/inspect_robots/experiments/usb-insertion/runs/run-002",
+    "boundaries": 24,
+    "errors": [],
+    "dual_camera": "passed",
+    "viewport": "1600x1080"
+  }
+]

@@ -1,0 +1,56 @@
+[
+  {
+    "file": "trial01_microstep_main.jpg",
+    "trial": 1,
+    "step": null,
+    "camera": "main",
+    "source": "integrations/inspect_robots/astra-yam3-run-001/replay-frames/f8a28569c32f9e8fe9d53ac198d7e3c836007e0ac9d89ba56a19b1754c693d9e.jpg",
+    "sha256": "f8a28569c32f9e8fe9d53ac198d7e3c836007e0ac9d89ba56a19b1754c693d9e",
+    "recorded_monotonic_ns": 217712568767360
+  },
+  {
+    "file": "trial11_table_contact_main.jpg",
+    "trial": 11,
+    "step": 1231,
+    "camera": "main",
+    "source": "integrations/inspect_robots/astra-yam3-run-011/replay-frames/1bfdf4be6150ad7ce56696ab70a561b4f83d290d7e38965aceea0921d081d646.jpg",
+    "sha256": "1bfdf4be6150ad7ce56696ab70a561b4f83d290d7e38965aceea0921d081d646",
+    "recorded_monotonic_ns": 66255770852936
+  },
+  {
+    "file": "trial12_tilted_wrist_right.jpg",
+    "trial": 12,
+    "step": 1020,
+    "camera": "right",
+    "source": "integrations/inspect_robots/astra-yam3-run-012/replay-frames/29e0b46c21e4cf061daa194a576a5d93e48dad7589e3c9cb759d2e2048efaa3f.jpg",
+    "sha256": "29e0b46c21e4cf061daa194a576a5d93e48dad7589e3c9cb759d2e2048efaa3f",
+    "recorded_monotonic_ns": 69967598762341
+  },
+  {
+    "file": "trial13_lift_right.jpg",
+    "trial": 13,
+    "step": 889,
+    "camera": "right",
+    "source": "integrations/inspect_robots/astra-yam3-run-013/replay-frames/e2eaa985f40280ba1cd18d27036525872788673acb047d0f5e903bd1dc059996.jpg",
+    "sha256": "e2eaa985f40280ba1cd18d27036525872788673acb047d0f5e903bd1dc059996",
+    "recorded_monotonic_ns": 205299481590394
+  },
+  {
+    "file": "trial13_placement_main.jpg",
+    "trial": 13,
+    "step": 1764,
+    "camera": "main",
+    "source": "integrations/inspect_robots/astra-yam3-run-013/replay-frames/ec59a52dead842aeded31abcf3c41dcc93497e9983b187b8a0dc6c6b95aea447.jpg",
+    "sha256": "ec59a52dead842aeded31abcf3c41dcc93497e9983b187b8a0dc6c6b95aea447",
+    "recorded_monotonic_ns": 205748193740874
+  },
+  {
+    "file": "trial15_placement_rest_main.jpg",
+    "trial": 15,
+    "step": 1782,
+    "camera": "main",
+    "source": "integrations/inspect_robots/astra-yam3-run-015/replay-frames/3c3ca78701478271dbe37210f4857ae20d8d5e4e3eb51e0a18a374a6e1760343.jpg",
+    "sha256": "3c3ca78701478271dbe37210f4857ae20d8d5e4e3eb51e0a18a374a6e1760343",
+    "recorded_monotonic_ns": 215960650638443
+  }
+]

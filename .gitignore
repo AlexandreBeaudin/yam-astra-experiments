@@ -20,3 +20,7 @@ data/
 *.mcap
 *.bag
 *.bak
+
+# Generated report-transfer archives
+integrations/inspect_robots/YAM3_ASTRA_REPORT_BUNDLE/
+*.zip

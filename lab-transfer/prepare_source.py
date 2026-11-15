@@ -62,6 +62,24 @@ def prepare(destination):
         if path.is_file() and (path.suffix in {'.py', '.md', '.html'} or path.name in {
             'astra_exploration.txt', 'upstream-lock.json', 'runtime-deps-lock.json'}):
             copy(path, path.relative_to(SOURCE))
+    # Task definitions and compact report evidence, never live episode folders.
+    for folder in ('report_assets',):
+        for path in (integration / folder).rglob('*'):
+            copy(path, path.relative_to(SOURCE))
+    for task in (integration / 'experiments').glob('*'):
+        if not task.is_dir():
+            continue
+        for path in task.iterdir():
+            if path.is_file() and (path.suffix in {'.md', '.txt', '.json', '.py'} or path.name == '.gitignore'):
+                copy(path, path.relative_to(SOURCE))
+        for path in task.rglob('.gitkeep'):
+            copy(path, path.relative_to(SOURCE))
+    for name in ('run-003-transition.json', 'run-010-resume/assessment.json',
+                 'trial014-depth-recovery/REVIEW.md', 'trial014-depth-recovery/evidence.json',
+                 'trial014-depth-recovery/decision-comparison.jpg'):
+        path = integration / 'offline-review' / name
+        if path.is_file():
+            copy(path, path.relative_to(SOURCE))
     for name in ('preview_cameras.py', 'ASTRA_PICK_AND_PLACE_GUIDE.md',
                  'yam3-sunday/capture_observations.py', 'lab-transfer/prepare_source.py',
                  'lab-transfer/README.md'):

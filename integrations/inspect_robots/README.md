@@ -1,3 +1,84 @@
+## Two continuous camera views
+
+The replay now presents main and right-wrist recordings in equal large panels
+across the top, without cropping or picture-in-picture occlusion. At 1600×1080
+each camera image occupies 600×450 pixels (source 640×480); telemetry and decision
+snapshots sit below. Smaller screens stack the panels. Both streams select the
+latest preview_recording frame at or before the current playback time, independently
+by receipt timestamp; the sample-age label exposes holds/gaps. Policy snapshots
+remain separate and update only at decision boundaries. Missing continuous wrist
+recordings show an explicit empty state rather than substituting model snapshots.
+
+Regenerate an existing replay with export_replay_mp4.py --run-dir RUN --html-only.
+Future HTML and MP4 exports use this layout; existing MP4 files keep their previous
+layout until re-exported. No robot connection is required to rebuild replays.
+
+## Separate USB-A insertion experiments
+
+Use `astra_run.py --task usb-insertion --attempt 1` for offline preflight;
+add `--check-station` for the read-only service check and `--run
+--right-channel-confirmed can_yam_a` only for an attended live episode.
+The USB prompt lives in `experiments/usb-insertion/prompt.txt`; recordings go to
+`experiments/usb-insertion/runs/run-NNN/`, including the prompt snapshot, task
+metadata, model/tool evidence, camera journal, result and generated replay.html.
+The existing exporter accepts these folders with `--title 'USB-A cable insertion'`.
+
+[USB setup and fish run/replay commands](experiments/usb-insertion/README.md)
+include optional console logging and cold-start instructions. The default task
+remains pick-and-place with its original prompt/output locations. USB requests
+use plug/port guidance rather than block descent or return-to-rest instructions.
+Cross-task checkpoint resumes are rejected. Both tasks share the same station
+lock: separate recording namespaces do not permit simultaneous control of YAM3.
+The 0.80/1.0 caps, low-level guards and medium reasoning effort are unchanged.
+
+## Trial 14 review: wrist-depth gating and recoverable contact
+
+Trial 14 issued two empty closures (decisions at steps 538 and 731), followed
+by a model-issued give_up at step 884. No guard_intervention was recorded;
+the largest decision residual was about 0.0416 rad, below the unchanged 0.08
+hardware tracking guard. The saved frame shows a tipped block against a pad.
+
+Rule 2 now prioritizes wrist-view pad-to-side depth evidence over apparent
+main-view overlap. It uses scale change as supporting evidence, not a fixed
+frame-fill threshold. Misses require reassessing fore-aft/XY alignment as well
+as height. Contact pauses descent; a small, visually supported, guard-permitted
+upward withdrawal/reversal can precede re-centering and another grasp attempt.
+Tool/observation guidance and give_up descriptions use the same recovery policy.
+A visibly clear recovery path is required; this is not an automatic recovery
+controller or permission to override faults. Grasp readback must be corroborated
+by seeing the block lift. Cap/interpolation/lag guards and medium effort are unchanged.
+
+See [the evidence review](offline-review/trial014-depth-recovery/REVIEW.md) and
+its decision-image comparison. Archived Trial 14 prompt/logs remain unchanged.
+
+## Trial 14: V4 prompt and 0.80 rad call ceiling
+
+The current prompt is V4: center the held block directly over the black X,
+use object-agnostic grasp feedback (>0.10 and steady during lift), then verify
+placement and return to the step-0 resting angles using coupled move_joints
+before done. The scene instruction is aligned with that goal. No left-camera
+instructions were added; reasoning.effort remains medium.
+
+MAX_MOVE_RAD and the optional attended-path ceiling are 0.80 rad/joint.
+This remains a global per-call guard, as before; the prompt requests 0.40–0.80
+only in clear transit, 0.10–0.20 during descent, and 0.02–0.05 for final XY
+centering. The 1.0 gripper cap, 0.003/0.02 per-waypoint interpolation, joint
+bounds and 0.08 rad measured/setpoint lag guard are unchanged.
+
+The supplied prompt requests two return calls; this is not an automatic homing
+routine or a guarantee that every starting displacement fits in two calls.
+Any joint displacement above 1.60 rad requires more than two calls at this cap;
+existing guards remain authoritative. Contact/grasp criteria are visual/model
+instructions, not new automatic contact detection. Saved trials and resumed
+prompt histories retain their original evidence. Older sections below describe
+historical settings. Pre-change .bak files are kept alongside modified files.
+
+Offline preflight for the new episode (no service or model connection):
+
+```fish
+YAM/gello_software/.venv/bin/python integrations/inspect_robots/astra_run.py --attempt 14
+```
+
 ## Publication replay viewer and MP4 export (2026-11-15)
 
 See [REPLAY_VIEWER.md](REPLAY_VIEWER.md) for the shared viewer/exporter, CLI, run-011/012 schema audit, clock semantics and local font assets. Existing runner HTML export uses the new UI automatically; MP4 rendering is offline.

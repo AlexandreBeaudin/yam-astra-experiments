@@ -88,8 +88,8 @@ class AstraPreparationTests(unittest.TestCase):
         arm, robot = make_arm()
         arm.reset(Scene(id='larger-move', instruction='Observe'))
         target = arm.last.copy()
-        target[0] += .45
-        self.assertIsNone(arm.pre_check(np.linspace(arm.last, target, 152)[1:]))
+        target[0] += .80
+        self.assertIsNone(arm.pre_check(np.linspace(arm.last, target, 269)[1:]))
         target[0] += .00001
         self.assertIn('split the motion', arm.pre_check([target]))
         target[0] = .12
@@ -107,7 +107,7 @@ class AstraPreparationTests(unittest.TestCase):
             adapter.bind(arm.info)
             tools = run.station_motion_tools(adapter.tools, arm)
             target = arm.last.copy()
-            target[:4] = [.45, .45, .45, -.45]
+            target[:4] = [.80, .80, .80, -.80]
             target[6] = 0.0
             result = tools.execute('move_joints', json.dumps(dict(
                 targets=dict(zip(run.LABELS, target.tolist())), note='[Stage 1] Synthetic coupled transit')), observation)
@@ -116,7 +116,7 @@ class AstraPreparationTests(unittest.TestCase):
             np.testing.assert_allclose(path[-1], target)
             self.assertLessEqual(np.max(np.abs(np.diff(path[:, :6], axis=0))), .003 + 1e-9)
             self.assertLessEqual(np.max(np.abs(np.diff(path[:, 6]))), .02 + 1e-9)
-            for index, value in ((0, .45001), (6, -.00001), (6, 1.00001)):
+            for index, value in ((0, .80001), (6, -.00001), (6, 1.00001)):
                 too_far = target.copy()
                 too_far[index] = value
                 rejected = tools.execute('move_joints', json.dumps(dict(
@@ -130,19 +130,30 @@ class AstraPreparationTests(unittest.TestCase):
                 self.assertIn(run.PROMPT.read_text().strip(), system)
                 self.assertIn('`right_j0` (Base yaw)', system)
                 self.assertIn('`right_j4` & `right_j5` (Wrist roll/flange)', system)
-                self.assertIn('Table-Contact & Early-Release Safety During Placement', system)
+                self.assertIn('Table-Contact Guard & Centered Release on X', system)
                 self.assertIn('Never press the block into the table', system)
                 self.assertNotIn('Initial pose:', system)
                 self.assertNotIn('max_output_tokens', body)
                 self.assertEqual(body['reasoning']['effort'], 'medium')
                 self.assertNotIn('small, deliberate motions', system)
-                self.assertIn('Lift & Post-Release Verification', system)
+                self.assertIn('Verify, Return to Rest & Finish', system)
                 self.assertIn('Do NOT close `right_gripper` until BOTH', system)
-                self.assertIn('make a decisive downward step (`+0.12` to `+0.18 rad`', system)
-                self.assertIn('NEVER call `give_up` because the block moved on the table', system)
+                self.assertIn('descend decisively (`+0.12` to `+0.18 rad`', system)
+                self.assertIn('NEVER call `give_up` because the block shifted on the table', system)
                 move = next(t for t in body['tools'] if t['name'] == 'move_joints')
-                self.assertIn('Effective cap: 0.45', move['description'])
+                self.assertIn('Effective cap: 0.8', move['description'])
                 self.assertIn('1.00 gripper', move['description'])
+                self.assertIn('exact step-0 initial readback angles', system)
+                self.assertIn('centered directly over the black `X` mark', system)
+                self.assertIn('stalls `right_gripper > 0.10` and holds steady', system)
+                self.assertNotIn('0.45–0.65', run.PROMPT.read_text())
+                self.assertIn('Do not close the gripper based on overhead alignment alone', system)
+                self.assertIn('not a fixed frame-fill threshold', system)
+                self.assertIn('Stopping descent does not mean ending the episode', system)
+                self.assertNotIn('Stop on unexpected contact or guard trips.', system)
+                give_up = next(t for t in body['tools'] if t['name'] == 'give_up')
+                self.assertIn('upward withdrawal or reversal', json.dumps(give_up))
+                self.assertIn('Arm per-call ceiling 0.80', arm.action_guidance())
                 self.assertNotIn('0.15 rad/joint ceiling', json.dumps(body))
                 self.assertNotIn('Gripper ceiling 0.10', json.dumps(body))
                 names = {t['name'] for t in body['tools']}
@@ -235,7 +246,7 @@ class AstraPreparationTests(unittest.TestCase):
             if len(bodies) == 1:
                 self.assertIn('extrinsics', json.dumps(body))
                 # A too-large request must return feedback without executing it.
-                name, args = 'move_joints', {'targets': {'right_j0': .46}, 'note': 'Synthetic invalid large probe.'}
+                name, args = 'move_joints', {'targets': {'right_j0': .81}, 'note': 'Synthetic invalid large probe.'}
             elif len(bodies) == 2:
                 self.assertIn('pre-check rejected', json.dumps(body))
                 self.assertEqual(len(robot.commands), 0)
