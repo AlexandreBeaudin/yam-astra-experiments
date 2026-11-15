@@ -176,6 +176,27 @@ before expecting the entire historical test suite to run here.
 
 ## 6. Configure the second station — do not reuse YAM3 identity
 
+### Local adaptation on `ps`
+
+This checkout has been adapted to the operator-confirmed physical mapping
+left=`can_follower_l`, right=`can_follower_r`, using
+`/home/ps/.config/yam/profiles/default.yaml`. The runner retains an exact hostname
+guard for `ps` and an exact channel mapping guard. On this station, replace
+`--right-channel-confirmed can_yam_a` in step 8 with
+`--right-channel-confirmed can_follower_r`.
+
+To repeat local profile setup here (offline, no hardware connections):
+
+```fish
+YAM/gello_software/.venv/bin/python lab-transfer/configure_local_station.py \
+  --profile /home/ps/.config/yam/profiles/default.yaml --expected-host ps \
+  --left-channel can_follower_l --right-channel can_follower_r --apply
+```
+
+The original station instructions below describe the source mapping. Local setup
+and offline preflight do not verify live hardware, camera views or motor gains;
+complete step 7 before a trial.
+
 The current runner has an exact hostname check for `rhos-nuc-1`, reads
 `profiles/shurui-mcap.yaml`, expects logical left=`can_yam_b` and right=`can_yam_a`,
 and imports the observer from `yam3-sunday/`. The directory names can stay unchanged.
@@ -226,6 +247,22 @@ Astra imports only its `PreviewClient`, which does not invoke that CLI. Do not u
 the standalone observer CLI on the second station without adapting its own guard.
 
 ## 7. Start/check the local services — second station, attended
+
+Local startup correction (2026-11-16): this checkout now queues measured-position
+PD holding before starting follower control threads, preserves arm holding during
+automatic gripper calibration, and starts GELLO-facing followers in position hold
+rather than gravity-compensation idle. Startup phase logs include the original
+arm pose and measured changes. Invalid initial joint poses or drift exceeding
+0.05 rad abort initialization and roll back the hardware; independent mechanical
+support remains required during attended startup and rollback. The precheck shares
+the existing initialization tolerance of 0.1 rad beyond the configured limits.
+The logged left-arm joint 2 position of -0.15469 rad is therefore accepted by the
+existing effective -0.25 rad initialization threshold. An earlier version of this
+precheck incorrectly omitted that tolerance and rejected it; this is corrected.
+Do not change limits or zero offsets to bypass rejection; review the physical pose
+and approved calibration. These changes have offline regression coverage only;
+they have not been validated by a new live startup. The original YAM3 Astra policy,
+camera inputs and task motion limits are unaffected.
 
 Use the station's normal shutdown/hold procedure before changing daemon source
 paths. **Do not start a second CAN owner or kill a daemon supporting the arms.**

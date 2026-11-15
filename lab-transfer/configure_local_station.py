@@ -10,7 +10,7 @@ import yaml
 ROOT=Path(__file__).resolve().parents[1]
 
 
-def configure(profile_path, expected_host, apply=False):
+def configure(profile_path, expected_host, apply=False, *, left_channel='can_yam_b', right_channel='can_yam_a'):
     if not (ROOT/'SOURCE_SNAPSHOT.json').exists():
         raise RuntimeError('Run this helper inside a prepared transfer snapshot, not the working YAM3 experiment directory.')
     actual=socket.gethostname().lower().split('.')[0]
@@ -27,8 +27,9 @@ def configure(profile_path, expected_host, apply=False):
     for side in ('left','right'):
         path=resolved(p['arms'][side]);p['arms'][side]=str(path)
         channels[side]=yaml.safe_load(path.read_text())['robot']['channel']
-    if channels!={'left':'can_yam_b','right':'can_yam_a'}:
-        raise ValueError(f'This runner requires lab-verified left=can_yam_b/right=can_yam_a; profile has {channels}. Do not relabel hardware to bypass this check. Have the lab adapt and verify the runner mapping.')
+    expected_channels={'left':left_channel,'right':right_channel}
+    if left_channel == right_channel or channels != expected_channels:
+        raise ValueError(f'This runner requires lab-verified mapping {expected_channels}; profile has {channels}. Do not relabel hardware to bypass this check. Have the lab adapt and verify the runner mapping.')
     p['cameras']['config']=str(resolved(p['cameras']['config']))
     if p['network'].get('host') not in ('127.0.0.1','localhost'):
         raise ValueError('The destination profile must use local station services')
@@ -38,6 +39,14 @@ def configure(profile_path, expected_host, apply=False):
         raise ValueError('Left and right configs must be distinct')
     runner=ROOT/'integrations/inspect_robots/astra_run.py'
     text=runner.read_text()
+    if expected_channels != {'left':'can_yam_b','right':'can_yam_a'}:
+        import ast
+        tree=ast.parse(text)
+        guards=[node for node in ast.walk(tree) if isinstance(node,ast.Compare)
+                and isinstance(node.left,ast.Name) and node.left.id=='channels'
+                and len(node.ops)==1 and isinstance(node.ops[0],ast.NotEq)]
+        if not any(ast.literal_eval(node.comparators[0]) == expected_channels for node in guards):
+            raise ValueError('Runner channel guard must first be adapted to the verified station mapping')
     old="if socket.gethostname().lower().split('.')[0] != 'rhos-nuc-1':"
     new=f"if socket.gethostname().lower().split('.')[0] != {actual!r}:"
     if old not in text and new not in text:
@@ -64,5 +73,7 @@ if __name__=='__main__':
     parser.add_argument('--profile',type=Path,required=True)
     parser.add_argument('--expected-host',required=True)
     parser.add_argument('--apply',action='store_true')
+    parser.add_argument('--left-channel',default='can_yam_b',help='Lab-verified physical left follower channel; runner must already match')
+    parser.add_argument('--right-channel',default='can_yam_a',help='Lab-verified physical right follower channel; runner must already match')
     args=parser.parse_args()
-    configure(args.profile,args.expected_host,args.apply)
+    configure(args.profile,args.expected_host,args.apply,left_channel=args.left_channel,right_channel=args.right_channel)

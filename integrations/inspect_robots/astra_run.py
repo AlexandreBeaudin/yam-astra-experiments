@@ -707,7 +707,7 @@ def attended_approach_check(arm, target, directory):
           f'Start: {path[0].tolist()}\nTarget: {target.tolist()}\n'
           f'{len(path)-1} waypoints; max joint change {np.max(delta[:6]):.6f} rad; SHA256 {approval.digest}\n'
           f'Inspect {directory.resolve()}/main.jpg, left.jpg, right.jpg and live three-camera views.\n'
-          'Operator must verify physical right arm can_yam_a, unchanged stationary left arm, '
+          'Operator must verify physical right arm can_follower_r, unchanged stationary left arm, '
           'camera identity/liveness, and lab-verified clearance of the entire interpolated swept '
           'links, wrist, fingers and cables (including tracking uncertainty up to 0.08 rad) '
           'and left-arm drift tolerance 0.05 rad, from table, block, paper, fixtures, other arm and people. '
@@ -762,8 +762,8 @@ def configuration():
     configs = {name: Path(path) for name, path in profile['arms'].items()}
     channels = {name: yaml.safe_load(path.read_text())['robot']['channel']
                 for name, path in configs.items()}
-    if channels != {'left': 'can_yam_b', 'right': 'can_yam_a'}:
-        raise RuntimeError('YAM3 profile channel mapping changed')
+    if channels != {'left': 'can_follower_l', 'right': 'can_follower_r'}:
+        raise RuntimeError('Local station profile channel mapping changed')
     return profile, configs, channels
 
 
@@ -777,7 +777,7 @@ def main():
     parser.add_argument('--model-attempts', type=int, default=MODEL_ATTEMPTS, help='Total attempts per model request (default: 4)')
     parser.add_argument('--attempt', type=int, default=2,
         help='Explicit episode number (default: 2); existing attempts cannot be reused')
-    parser.add_argument('--right-channel-confirmed', choices=['can_yam_a'],
+    parser.add_argument('--right-channel-confirmed', choices=['can_follower_r'],
         help='Operator has identified the physical task arm as the configured right follower')
     parser.add_argument('--approach-target', type=float, nargs=7,
         metavar=('J0', 'J1', 'J2', 'J3', 'J4', 'J5', 'GRIPPER'),
@@ -814,10 +814,10 @@ def main():
     if args.run and output.exists():
         parser.error(f'attempt already consumed: {output}. Preserve its logs; '
                      'use --attempt with a new episode number to start a separate episode.')
-    if socket.gethostname().lower().split('.')[0] != 'rhos-nuc-1':
-        parser.error('station operations must run on rhos-nuc-1')
+    if socket.gethostname().lower().split('.')[0] != 'ps':
+        parser.error('station operations must run on ps')
     if args.run and (args.right_channel_confirmed is None or not os.environ.get('RHOS_API_KEY')):
-        parser.error('--run needs RHOS_API_KEY and --right-channel-confirmed can_yam_a')
+        parser.error('--run needs RHOS_API_KEY and --right-channel-confirmed can_follower_r')
     from gello.safety.rpc import SafetyClient
     from gello.safety.daemon_client import validate_daemon_status
     from gello.safety.identity import daemon_identity, validate_daemon_identity
