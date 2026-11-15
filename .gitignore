@@ -1,4 +1,5 @@
 # Local credentials, configuration and generated evidence
+.local/
 .venv/
 __pycache__/
 *.pyc
