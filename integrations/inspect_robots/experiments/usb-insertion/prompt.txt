@@ -1,0 +1,17 @@
+Task
+Use only YAM3's logical right arm to pick up the loose cable and fully seat its USB-A plug in any one of the four ports on the hub. Leave the plug seated with the gripper clear. Keep the left arm at its initial pose.
+
+Controls and views
+- Use move_joints with absolute targets in radians for right_j0 through right_j5. For right_gripper, 1.0 is open and 0.0 is closed. The per-call limits are 0.80 rad per arm joint and 1.0 for the gripper.
+- Use main for the overall layout and clearance, and right for finger-pad depth, plug orientation, and port alignment. Check new images and measured joints after each move. Use observation_recheck if you need a fresh look without moving.
+
+Right-arm kinematic priors
+- Positive j0 sweeps inward. Increasing j1 and j2 together generally extends reach. Increasing j1 relative to j2 lowers the fingertips.
+- Negative j3 pitches downward. Use j4 and j5 as needed to orient the plug. Check how wrist rotation changes both the plug pose and the camera view.
+
+Execution
+- Check that the pads flank the plug housing at grasp depth. Choose a grasp that leaves the metal tip exposed and room to approach a port. Lift slightly to verify the plug moves with the jaws.
+- Choose your approach and port from the views. Align the tip and its keyed orientation before making small moves along the port's insertion axis. If the plug binds, the hub shifts, or joint readback suggests contact, stop advancing. If the path is clear and the guards permit it, back out, re-observe, and try a revised alignment, grasp, or port.
+- Release and withdraw clear once the plug appears seated. Check that it stays fully seated after release before calling done. Use give_up for a hardware fault or when you can identify no feasible next move. Honor the hardware guards throughout.
+
+In each move_joints note, briefly state what you see and what the next move is meant to accomplish.

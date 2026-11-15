@@ -1,0 +1,30 @@
+{
+  "011": {
+    "episode_duration_s": 1011.854104018,
+    "continuous_main_frames": 4231,
+    "main_median_interval_s": 0.23271379699997397,
+    "decision_observations": 27,
+    "model_intervals": 27,
+    "tools": 27,
+    "motion_steps": 1231,
+    "missing_frames": 0,
+    "damaged_lines": 0,
+    "model": "GPT-6 Astra",
+    "effort": "medium",
+    "station_events_sha256": "0b64590a1268342d291652acb29831294e1a9ee07c8256c5953c8a2227afd9a7"
+  },
+  "012": {
+    "episode_duration_s": 1046.655441227,
+    "continuous_main_frames": 4416,
+    "main_median_interval_s": 0.23217143299996224,
+    "decision_observations": 22,
+    "model_intervals": 22,
+    "tools": 22,
+    "motion_steps": 1072,
+    "missing_frames": 0,
+    "damaged_lines": 0,
+    "model": "GPT-6 Astra",
+    "effort": "medium",
+    "station_events_sha256": "2c44c9963f4cbbc929d56ce8ad1d54154a72b0ab54827c9e2f89233520955ee2"
+  }
+}

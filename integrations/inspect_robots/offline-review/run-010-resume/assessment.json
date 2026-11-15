@@ -1,0 +1,24 @@
+{
+  "source": "astra-yam3-run-010",
+  "offline_context_recovery_verified": true,
+  "exact_responses_roundtrip_verified": true,
+  "image_blob_checksums_verified": true,
+  "successful_requests": 26,
+  "failed_request_number": 27,
+  "failed_request_duration_s": 122.98685264587402,
+  "failed_request_error": "The read operation timed out",
+  "saved_motion_step": 1014,
+  "original_final_hold_confirmed": true,
+  "live_pose_verified": false,
+  "hardware_resumed": false,
+  "live_check_error": "safety daemon timeout during status (127.0.0.1:6002) from restricted coding session",
+  "defaults": {
+    "model_timeout_s": 600,
+    "total_model_attempts": 4
+  },
+  "regression_suite": {
+    "tests": 67,
+    "status": "passed"
+  },
+  "resume_command": "PYTHONDONTWRITEBYTECODE=1 YAM/gello_software/.venv/bin/python integrations/inspect_robots/astra_run.py --resume integrations/inspect_robots/astra-yam3-run-010 --run --right-channel-confirmed can_yam_a"
+}

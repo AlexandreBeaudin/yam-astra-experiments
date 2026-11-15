@@ -315,14 +315,17 @@ there is no need to point either runner at the other's IP address.
 
 ## 8. Choose a task, enter the API key, run
 
-For a different task, edit **both** the prompt and the scene instruction:
+The built-in USB task is selected with `--task usb-insertion`; see
+`integrations/inspect_robots/experiments/usb-insertion/README.md`. Its goal, prompt
+and output folders are already separate. For a new, unregistered task, edit the
+relevant prompt and the matching scene instruction:
 
 ```fish
 nano integrations/inspect_robots/astra_exploration.txt
 nano integrations/inspect_robots/astra_run.py
 ```
 
-In `astra_run.py`, change the goal string inside `execute()` / `Scene(instruction=...)`;
+In `astra_run.py`, scene goals are selected in `task_configuration()`;
 it currently also hardcodes pink-block-to-X-paper. Editing only the text prompt
 would leave conflicting goals. Keep arm restrictions, guards and limits unless a
 separate reviewed experiment calls for changes. V3's geometric priors assume the

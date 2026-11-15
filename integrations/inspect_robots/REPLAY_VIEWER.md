@@ -1,3 +1,18 @@
+## Two continuous camera views
+
+The replay now presents main and right-wrist recordings in equal large panels
+across the top, without cropping or picture-in-picture occlusion. At 1600×1080
+each camera image occupies 600×450 pixels (source 640×480); telemetry and decision
+snapshots sit below. Smaller screens stack the panels. Both streams select the
+latest preview_recording frame at or before the current playback time, independently
+by receipt timestamp; the sample-age label exposes holds/gaps. Policy snapshots
+remain separate and update only at decision boundaries. Missing continuous wrist
+recordings show an explicit empty state rather than substituting model snapshots.
+
+Regenerate an existing replay with export_replay_mp4.py --run-dir RUN --html-only.
+Future HTML and MP4 exports use this layout; existing MP4 files keep their previous
+layout until re-exported. No robot connection is required to rebuild replays.
+
 # YAM3 episode replay and video export
 
 The runner already invokes `hardware_replay.export_replay()` in its post-run cleanup,

@@ -23,7 +23,7 @@ class AttendedApproachTests(unittest.TestCase):
         self.arm, self.robot = make_arm()
         self.arm.reset(Scene(id='review', instruction='offline'))
         self.target = self.arm.last.copy()
-        self.target[0] += .45
+        self.target[0] += .80
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.directory = Path(self.temp.name) / 'review'
@@ -49,16 +49,16 @@ class AttendedApproachTests(unittest.TestCase):
         approval = self.arm.verified_approach
         record = json.loads((self.directory / 'path.json').read_text())
         self.assertTrue(record['approved'])
-        self.assertEqual(record['cap_rad'], .45)
+        self.assertEqual(record['cap_rad'], .80)
         self.assertEqual(record['path_sha256'], approval.digest)
         for view in ('main', 'left', 'right'):
             self.assertTrue((self.directory / f'{view}.jpg').exists())
-        self.assertIn('Effective cap: 0.45', self.arm.motion_allowance())
+        self.assertIn('Effective cap: 0.8', self.arm.motion_allowance())
         self.assertIn('right_j0', self.arm.motion_allowance())
         result = self.plan()
         self.assertIsNone(result.error)
         np.testing.assert_array_equal(np.stack([a.data for a in result.chunk.actions]), approval.path[1:])
-        self.assertIn('Effective cap: 0.45', self.arm.motion_allowance())
+        self.assertIn('Effective cap: 0.8', self.arm.motion_allowance())
         self.assertFalse(approval.available(self.arm.last))  # Review consumed; default cap still applies.
         self.assertIsNone(self.plan().error)
         self.assertFalse(self.robot.commands)
@@ -70,7 +70,7 @@ class AttendedApproachTests(unittest.TestCase):
             body = json.loads(request.content)
             bodies.append(body)
             text = json.dumps(body)
-            self.assertIn('Effective cap: 0.45', text)
+            self.assertIn('Effective cap: 0.8', text)
             self.assertIn(self.arm.verified_approach.digest, text)
             return httpx.Response(200, json={'status': 'completed', 'output': [{
                 'type': 'function_call', 'call_id': 'verified-path', 'name': 'move_joints',
@@ -91,13 +91,13 @@ class AttendedApproachTests(unittest.TestCase):
         other = self.target.copy()
         other[1] += .001
         self.assertIsNone(self.plan(other).error)
-        other[0] = -.45
+        other[0] = -.80
         self.assertIsNone(self.plan(other).error)
         for phase in run.MOTION_PHASES[1:]:
             self.assertIsNone(self.plan(phase=phase).error)
         self.arm.verified_approach.expires = 0
         self.assertIsNone(self.plan().error)
-        self.assertIn('Effective cap: 0.45', self.arm.motion_allowance())
+        self.assertIn('Effective cap: 0.8', self.arm.motion_allowance())
         self.assertFalse(self.robot.commands)
 
     def test_decline_non_attended_and_station_drift_fail_closed(self):

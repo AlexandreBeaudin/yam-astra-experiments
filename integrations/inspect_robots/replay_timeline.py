@@ -100,5 +100,7 @@ def build_timeline(data, *, title=None, harness_label='Inspect Robots', metadata
                 model=model_name, effort=metadata.get('effort', 'unknown'),
                 main=[dict(time_s=f['time_s'], image=f.get('image')) for f in frames
                       if f.get('camera') == 'main' and f.get('source') == 'preview_recording'],
+                right=[dict(time_s=f['time_s'], image=f.get('image')) for f in frames
+                       if f.get('camera') == 'right' and f.get('source') == 'preview_recording'],
                 decisions=decisions, models=models, tools=tools, motion=motion,
                 timing_note='Receipt timestamps; exposure times unknown. Tools show inferred execution envelopes. Motion shows recorded dispatch-to-step-end intervals.')

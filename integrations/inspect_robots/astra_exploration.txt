@@ -1,32 +1,32 @@
-Task: Execute one pick-and-place episode on YAM3 using ONLY the logical right arm (`right_j0`..`right_j5`, `right_gripper`) to pick up the pink block and place it fully inside the white paper marked X. Keep the left arm strictly at its initial pose. Never home or park.
+Task: Execute one pick-and-place episode on YAM3 using ONLY the logical right arm (`right_j0`..`right_j5`, `right_gripper`) to pick up the pink block, place it centered on the black X on the white paper, and return the arm to its initial resting pose before calling `done`. Keep the left arm strictly at its initial pose. Never trigger a blind hardware reset/park command.
 
-Available Control & Hardware Limits:
-- Control mode: `move_joints` (absolute joint targets in radians; `right_gripper`: `1.0` = open, `0.0` = closed).
-- Per-call motion limits: up to `0.45 rad` delta per arm joint (`right_j0`..`right_j5`) in clear workspace, and up to `1.0` delta on `right_gripper` (full open or close in a single call).
-- Observations: `main` (3rd-person table view), `right` (right-wrist eye-in-hand view), `left` (left-wrist view), and `main_comparison` (previous/current `main` crop).
+Control & Camera Setup:
+- Tool: `move_joints` with absolute right-arm targets in radians (`right_gripper`: `1.0` = open, `0.0` = closed).
+- Per-call limits: up to `0.80 rad` delta per arm joint (`right_j0`..`right_j5`) in clear space, and up to `1.0` delta on `right_gripper` (full open/close in one call).
+- Views: `main` (angled table view for overall clearance and placement verification) and `right` (wrist view for approach depth relative to the finger pads and XY centering).
 
-YAM3 Right-Arm Kinematic Priors (Robot Hardware Geometry):
-- `right_j0` (Base yaw): Increasing (`+`) sweeps the right arm inward/left across the table; decreasing (`-`) sweeps outward/right.
-- `right_j1` (Shoulder) + `right_j2` (Elbow): Increasing both together (`+j1`, `+j2` at ~1:1) extends reach radially outward across the table at roughly constant height. Increasing `+j1` while holding or slightly decreasing `j2` lowers the fingertips toward the table; decreasing `-j1` while increasing `+j2` lifts them.
-- `right_j3` (Wrist pitch): Decreasing (`-`) pitches the gripper and wrist camera downward toward the table (`j3 ≈ -0.60` points the fingers vertically downward).
-- `right_j4` & `right_j5` (Wrist roll/flange): Keep `right_j4` and `right_j5` near their initial neutral angles (`~ -0.03`, `~ -0.07`). The neutral jaw orientation is already level with the table and parallel to the table axes; rotating `j5` when pitched downward tilts one finger lower than the other. Only rotate `j5` if the block is visibly skewed by >25° relative to the table grid.
+YAM3 Right-Arm Kinematic Priors:
+- `right_j0` (Base yaw): `+` sweeps inward/left across the table; `-` sweeps outward/right.
+- `right_j1` (Shoulder) + `right_j2` (Elbow): Increasing both together (`+j1`, `+j2` at ~1:1) extends reach radially outward at roughly constant height. Increasing `+j1` relative to `j2` lowers the fingertips toward the table; decreasing `-j1` relative to `j2` lifts them.
+- `right_j3` (Wrist pitch): `-` pitches the gripper and wrist camera downward (`j3 ≈ -0.60` points vertically down).
+- `right_j4` & `right_j5` (Wrist roll/flange): Keep near initial neutral angles (`~ -0.03`, `~ -0.07`) so the jaw crossbar stays level with the table. Only rotate `j5` if the block is visibly skewed by >25° relative to the table grid.
 
-Execution Policy (Closed-Loop Visual & Proprioceptive Control):
-1. Coupled Moves: Combine active joints (`j0`, `j1`, `j2`, `j3`) simultaneously (`0.25–0.45 rad` per active joint in clear space; `0.10–0.18 rad` during descent) whenever clear space is visible in `main`. Only use fine steps (`0.02–0.05 rad`) during final XY centering right above the target.
-2. Judging Depth Before Closing (`main` + `right` Views):
-   - Because `main` views the table at an angle, fingertips that are still several centimeters above the block can visually overlap its top face.
-   - Do NOT close `right_gripper` until BOTH: (a) `right` view shows the pink block centered between the open finger pads, AND (b) `main` view clearly shows the black fingertips have descended BELOW the block's top face so the pads straddle the lower half of the block near the tablecloth surface.
-3. Closed-Loop Recovery After a Missed Grasp:
-   - A secure grasp stalls `right_gripper` around `0.45–0.65`. If `right_gripper: 0.0` closes to `< 0.10`, the jaws were too high and missed or only clipped the top edge.
-   - Immediately reopen (`right_gripper: 1.0`). If the jaws closed in empty air above the block, make a decisive downward step (`+0.12` to `+0.18 rad` on `right_j1`) before closing again. If reopening nudged or shifted the block, lift slightly (`-0.08 rad` on `j1`), re-center over the block's new position in `right` view, descend lower, and grasp again.
-4. Table-Contact & Early-Release Safety During Placement:
-   - After every move, compare `measured` vs commanded `targets`. If `measured` lags behind `targets` by `> 0.015 rad` on `j1`/`j2` OR `j3` deflects upward, the arm/block has contacted the table—NEVER command further downward motion.
-   - When placing the held block onto the white paper marked X, center it over X in `right` view and lower until `main` shows the bottom of the pink block touching or within ~1–2 cm of the paper surface, then immediately open `right_gripper: 1.0` in one call. Never press the block into the table.
-5. Lift & Post-Release Verification:
-   - After grasping, lift `~6–8 cm` (`-j1`, `+j2`) to confirm the block clears the table before moving laterally toward the paper.
-   - After releasing on the paper, retract upward `~10 cm` (`-j1`, `+j2`), verify in `main` that the entire pink block rests inside the white paper, and call `done`.
+Execution Policy:
+1. Coupled Moves: Combine active joints (`j0`..`j3`) simultaneously (`0.40–0.80 rad` per joint in clear transit; `0.10–0.20 rad` during descent; `0.02–0.05 rad` only during final XY centering right above the target).
+2. Wrist-Camera Depth Check Before Closing:
+   - Do not close the gripper based on overhead alignment alone. Use `right` as the primary approach-depth view: a small, distant block centered between the fingers is not yet at grasp depth. Compare successive wrist views as you descend; the block must occupy the central grasp region between the pads, with both pads visibly alongside opposite sides rather than hovering above its top or catching one corner.
+   - Do NOT close `right_gripper` until BOTH depth and XY alignment are supported by this pad-relative geometry in `right`. Apparent image size is supporting evidence, not a fixed frame-fill threshold or a calibrated distance: a tipped block can also look large. Use `main` to cross-check table/arm clearance; apparent overlap in `main` must never override an unresolved wrist-view gap. If the pad-to-side relationship is obscured, re-observe or reposition with clearance before closing.
+3. Grasp, Lift & Miss Recovery:
+   - Command `right_gripper: 0.0` in one call. A candidate grasp stalls `right_gripper > 0.10` and holds steady when lifted `~6–8 cm` (`-j1`, `+j2`); confirm visually that the block actually rises with the pads before lateral transfer. Closure readback alone is not proof of a grasp.
+   - If `right_gripper` closes to `< 0.10`, treat the grasp as missed, not proof that height was the only error. Reopen (`1.0`) if the opening path is clear, then reassess wrist depth and lateral/fore-aft centering. Only when the jaws are visibly above an upright block with clear descent, descend decisively (`+0.12` to `+0.18 rad` on `right_j1`), re-observe, and satisfy Rule 2 before retrying. If the block shifts, tips, or catches a pad, use contact recovery first; do not keep descending along the same misaligned path.
+4. Table-Contact Guard & Centered Release on X:
+   - After every move, compare `measured` vs commanded `targets`. Treat `> 0.015 rad` lag on `j1`/`j2`, unexpected wrist deflection, or visible block tipping as possible contact: stop further downward motion and reassess. A small residual alone does not identify the contact location. Stopping descent does not mean ending the episode.
+   - For recoverable block/table contact, keep the current gripper opening and withdraw slightly upward (`-j1`, with `+j2` only if needed), or reverse the last descent toward a previously clear pose, only when the withdrawal path is supported by the views and feedback and all hardware guards permit it. Re-observe after that bounded move; confirm separation and easing residuals before re-centering above the block, then descend with Rule 2. Do not sweep sideways, rotate the wrist, or force the gripper while a pad is caught. If withdrawal drags the block, increases deflection, or is blocked, stop and reassess rather than forcing recovery.
+   - Translate over the white paper until `right` shows the held block centered directly over the black `X` mark. Lower until `main` shows the bottom of the block touching or within ~1–2 cm of the paper, then immediately open `right_gripper: 1.0` in one call. Never press the block into the table.
+5. Verify, Return to Rest & Finish:
+   - Retract upward `~10 cm` (`-j1`, `+j2`) and verify in `main` that the pink block rests inside the white paper on the X.
+   - Return all right-arm joints (`right_j0`..`right_j5`, `right_gripper: 1.0`) back to their exact step-0 initial readback angles in 2 coupled `move_joints` calls (`≤ 0.80 rad/joint`), then call `done`.
 
-Guards & Failure Handling:
-- Nudging or shifting the foam block is normal and recoverable—NEVER call `give_up` because the block moved on the table.
-- Only call `give_up` if a hardware/CAN fault occurs, a safety guard blocks all recovery directions, or the block is knocked completely out of reach.
-- In `note`, write 1–2 concise sentences: `[Stage X] Visual alignment in main/right -> Coupled joint delta & purpose`.
+Guards & Notes:
+- Nudging the foam block is recoverable—NEVER call `give_up` because the block shifted on the table. Only call `give_up` on hardware/CAN faults, persistent safety-guard blocks with no permitted recovery direction, physical unreachability, or when no clear withdrawal/repositioning path can be established. For contact-related `give_up`, state why upward withdrawal or reversal is unavailable; contact alone is not a terminal condition. Never bypass a hardware guard.
+- In `note`, write 1–2 concise sentences: `[Stage X] Visual observation in main/right -> Coupled joint action & purpose`.
