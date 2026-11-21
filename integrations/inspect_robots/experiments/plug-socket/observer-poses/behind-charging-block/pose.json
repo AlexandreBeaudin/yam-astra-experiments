@@ -1,0 +1,190 @@
+{
+  "label": "Left camera right behind the charging block",
+  "captured_at": "2026-11-22T06:05:07.773133+08:00",
+  "daemon_mode_before": "gravity",
+  "daemon_mode_after": "gravity",
+  "snapshot_received_time_ns": 1795298707773456778,
+  "sides": {
+    "left": {
+      "channel": "can_follower_l",
+      "joint_names": [
+        "left_j0",
+        "left_j1",
+        "left_j2",
+        "left_j3",
+        "left_j4",
+        "left_j5"
+      ],
+      "source_time_ns": 1795298707773140992,
+      "joint_positions_rad": [
+        -0.6956206607156457,
+        2.514114595254444,
+        1.0591668574044402,
+        1.5630960555428395,
+        -0.6654840924696739,
+        -0.034142061493861675
+      ],
+      "gripper_opening_normalized": 0.9992068070377849,
+      "max_joint_variation_rad_during_capture": 0.0003814755474174092
+    },
+    "right": {
+      "channel": "can_follower_r",
+      "joint_names": [
+        "right_j0",
+        "right_j1",
+        "right_j2",
+        "right_j3",
+        "right_j4",
+        "right_j5"
+      ],
+      "source_time_ns": 1795298707769817088,
+      "joint_positions_rad": [
+        0.5743114366369113,
+        2.559510185397116,
+        2.2371633478294033,
+        -0.5338750286106677,
+        0.26913099870298396,
+        0.5235751888303959
+      ],
+      "gripper_opening_normalized": 0.5157979620262445,
+      "max_joint_variation_rad_during_capture": 0.0
+    }
+  },
+  "preview_receive_span_ms": 1.881414,
+  "frames": {
+    "main": {
+      "file": "main.jpg",
+      "preview_received_time_ns": 1795298707772207584
+    },
+    "left": {
+      "file": "left.jpg",
+      "preview_received_time_ns": 1795298707773132591
+    },
+    "right": {
+      "file": "right.jpg",
+      "preview_received_time_ns": 1795298707774088998
+    }
+  },
+  "nominal_station_pose_rejection": null,
+  "trial10_static_fk_check": {
+    "certificate_method": "adaptive_two_endpoint_lipschitz_v1",
+    "threshold_m": 0.07350000000000001,
+    "evaluated_poses": 1,
+    "extra_samples": 0,
+    "certified_intervals": 0,
+    "min_sampled_distance_m": 0.09801304055163894,
+    "min_certified_lower_bound_m": null,
+    "accepted": true,
+    "reason": null
+  },
+  "bracketing_feedback": [
+    {
+      "received_time_ns": 1795298707771475928,
+      "left": {
+        "source_time_ns": 1795298707769254400,
+        "joint_positions_rad": [
+          -0.6956206607156457,
+          2.514114595254444,
+          1.0591668574044402,
+          1.563477531090257,
+          -0.6654840924696703,
+          -0.034142061493861675
+        ],
+        "gripper_opening_normalized": 0.9992068070377849
+      },
+      "right": {
+        "source_time_ns": 1795298707769817088,
+        "joint_positions_rad": [
+          0.5743114366369113,
+          2.559510185397116,
+          2.2371633478294033,
+          -0.5338750286106677,
+          0.26913099870298396,
+          0.5235751888303959
+        ],
+        "gripper_opening_normalized": 0.5157979620262445
+      }
+    },
+    {
+      "received_time_ns": 1795298707772521500,
+      "left": {
+        "source_time_ns": 1795298707769254400,
+        "joint_positions_rad": [
+          -0.6956206607156457,
+          2.514114595254444,
+          1.0591668574044402,
+          1.563477531090257,
+          -0.6654840924696703,
+          -0.034142061493861675
+        ],
+        "gripper_opening_normalized": 0.9992068070377849
+      },
+      "right": {
+        "source_time_ns": 1795298707769817088,
+        "joint_positions_rad": [
+          0.5743114366369113,
+          2.559510185397116,
+          2.2371633478294033,
+          -0.5338750286106677,
+          0.26913099870298396,
+          0.5235751888303959
+        ],
+        "gripper_opening_normalized": 0.5157979620262445
+      }
+    },
+    {
+      "received_time_ns": 1795298707773456778,
+      "left": {
+        "source_time_ns": 1795298707773140992,
+        "joint_positions_rad": [
+          -0.6956206607156457,
+          2.514114595254444,
+          1.0591668574044402,
+          1.5630960555428395,
+          -0.6654840924696739,
+          -0.034142061493861675
+        ],
+        "gripper_opening_normalized": 0.9992068070377849
+      },
+      "right": {
+        "source_time_ns": 1795298707769817088,
+        "joint_positions_rad": [
+          0.5743114366369113,
+          2.559510185397116,
+          2.2371633478294033,
+          -0.5338750286106677,
+          0.26913099870298396,
+          0.5235751888303959
+        ],
+        "gripper_opening_normalized": 0.5157979620262445
+      }
+    },
+    {
+      "received_time_ns": 1795298707774338937,
+      "left": {
+        "source_time_ns": 1795298707773140992,
+        "joint_positions_rad": [
+          -0.6956206607156457,
+          2.514114595254444,
+          1.0591668574044402,
+          1.5630960555428395,
+          -0.6654840924696739,
+          -0.034142061493861675
+        ],
+        "gripper_opening_normalized": 0.9992068070377849
+      },
+      "right": {
+        "source_time_ns": 1795298707773465600,
+        "joint_positions_rad": [
+          0.5743114366369113,
+          2.559510185397116,
+          2.2371633478294033,
+          -0.5338750286106677,
+          0.26913099870298396,
+          0.5235751888303959
+        ],
+        "gripper_opening_normalized": 0.5157979620262445
+      }
+    }
+  ]
+}
