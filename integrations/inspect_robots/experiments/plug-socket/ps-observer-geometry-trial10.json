@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "mode": "registered_fk",
+  "verified": true,
+  "provenance": "2026-11-20: operator reported approximately 55 cm between the base pivots and confirmed level, same-height, same-fore-aft mounts, matching forward axes at J0=0, and spacing accuracy within 1-2 cm. Operator-attested symmetric-rail registration, not camera/external metrology. Station frame is the right model base: X forward, Y toward the left base, Z up.",
+  "left_base_to_station": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      1.0,
+      0.0,
+      0.55
+    ],
+    [
+      0.0,
+      0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "right_base_to_station": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "minimum_separation_m": 0.0585,
+  "margin_m": 0.015,
+  "base_spacing_m": 0.55,
+  "spacing_uncertainty_m": 0.02,
+  "registration_method": "operator-measured parallel rail mounts"
+}

@@ -239,7 +239,7 @@ class AstraPreparationTests(unittest.TestCase):
             body = json.loads(request.content)
             bodies.append(body)
             self.assertFalse(body['store'])
-            self.assertEqual(body['model'], 'gpt-6-astra')
+            self.assertEqual(body['model'], 'gpt-6.2-astra')
             self.assertEqual(body['reasoning']['effort'], 'medium')
             self.assertNotIn('prompt_cache_options', body)
             self.assertNotIn('prompt_cache_breakpoint', json.dumps(body))

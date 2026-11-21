@@ -18,13 +18,30 @@ def build_timeline(data, *, title=None, harness_label='Inspect Robots', metadata
             metadata.setdefault('effort', response['reasoning']['effort'])
     events = sorted(data.get('events', []), key=lambda e: e.get('time_s', 0))
     frames = sorted(data.get('frames', []), key=lambda e: e.get('time_s', 0))
+    # Raw left preview is also archived in right-only runs. Its mere presence
+    # must not turn a two-camera baseline into an observer presentation. The
+    # event fallback also supports runners that imported the old exporter
+    # before this feature was installed while their episode was running.
+    active_observer = metadata.get('active_perception') is True or any(
+        e.get('kind') == 'observer_guard' or
+        (e.get('kind') == 'decision_observation' and len(e.get('measured_joints') or []) == 13)
+        for e in events)
+    default_layout = metadata.get('replay_layout', 'auto')
+    if default_layout not in ('auto', 'two', 'three'):
+        raise ValueError('replay layout must be auto, two or three')
+    if default_layout == 'auto':
+        default_layout = 'three' if active_observer else 'two'
+    left_masked = metadata.get('mask_left_view') is True or any(
+        e.get('kind') == 'decision_observation' and
+        e.get('cameras', {}).get('left', {}).get('masked') is True for e in events)
     duration = max([0] + [e.get('time_s', 0) for e in events + frames])
-    by_hash = {f.get('sha256'): f.get('image') for f in frames}
+    by_hash = {f['sha256']: f.get('image') for f in frames if f.get('sha256')}
     decisions = []
     for e in events:
         if e.get('kind') == 'decision_observation':
             decisions.append(dict(time_s=e['time_s'], step=e.get('step'), images={
-                camera: by_hash.get(info.get('sha256')) for camera, info in e.get('cameras', {}).items()}))
+                camera: by_hash.get(info.get('sha256')) for camera, info in e.get('cameras', {}).items()},
+                masked_views=[camera for camera, info in e.get('cameras', {}).items() if info.get('masked')]))
     models = []
     for e in events:
         if e.get('kind') == 'model_round_trip':
@@ -98,9 +115,12 @@ def build_timeline(data, *, title=None, harness_label='Inspect Robots', metadata
         model_name = 'GPT-6 Astra'
     return dict(duration_s=duration, title=title, harness_label=harness_label,
                 model=model_name, effort=metadata.get('effort', 'unknown'),
+                default_layout=default_layout, left_masked_for_policy=left_masked,
                 main=[dict(time_s=f['time_s'], image=f.get('image')) for f in frames
-                      if f.get('camera') == 'main' and f.get('source') == 'preview_recording'],
+                      if f.get('camera') == 'main' and f.get('source') in ('preview_recording', 'human_preview_recording')],
+                left=[dict(time_s=f['time_s'], image=f.get('image')) for f in frames
+                      if f.get('camera') == 'left' and f.get('source') == 'preview_recording'],
                 right=[dict(time_s=f['time_s'], image=f.get('image')) for f in frames
-                       if f.get('camera') == 'right' and f.get('source') == 'preview_recording'],
+                       if f.get('camera') == 'right' and f.get('source') in ('preview_recording', 'human_preview_recording')],
                 decisions=decisions, models=models, tools=tools, motion=motion,
                 timing_note='Receipt timestamps; exposure times unknown. Tools show inferred execution envelopes. Motion shows recorded dispatch-to-step-end intervals.')

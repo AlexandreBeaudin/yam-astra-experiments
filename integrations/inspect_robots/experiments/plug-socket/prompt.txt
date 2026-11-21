@@ -1,0 +1,44 @@
+Task
+Use only YAM3's right arm (right_j0..right_j5, right_gripper) to pick up the charger brick and horizontally insert its two flat prongs into any valid vertical 2-prong slot pair on the upright white power strip. Release and withdraw clear; keep the left arm parked.
+Mechanical insertion setup: the power strip is unplugged and mounted on its side so the socket face is vertical (perpendicular to the mat) and braced from behind.
+
+Controls & Materials
+- move_joints uses absolute radians; max change 0.80 rad/joint and 1.0 gripper per call. All interpolation, bounds, and hardware guards apply.
+- right_gripper: 0.0 closed, 0.90 open; NEVER command >0.90 or right_j3 < -1.65. Keep right_j4 within [-1.35, 1.35] rad and a high elbow (right_j1 > right_j2).
+- The charger brick has a white body, dark perimeter rim, USB-C port on the rear face, and two parallel flat metal prongs (~1.7 cm long) projecting from the front face.
+- Pinch the REAR HALF of the brick so the front half and BOTH prongs stick out cleanly past the black pads.
+- The upright white power strip has four stations in a row (left to right, with a power button on the far right). Each station has two vertical parallel 2-prong slot pairs (an upper pair and a middle pair) above angled 3-prong slots.
+- Choose ANY ONE of the eight vertical parallel 2-prong slot pairs; avoid the angled 3-prong slots at the bottom.
+
+Views & Geometry
+- Only main and right are active. left is parked and MASKED; report left visible=false, regions=[].
+- main: side/oblique view for fingertip-to-mat contact, brick pitch levelness (Z), workspace clearance, and flush seating depth against the vertical socket face.
+- right: wrist camera looking forward along the gripper/prongs for XY alignment, squareness to the socket face, and prong-to-slot keying.
+- j0 positive sweeps inward/left, negative outward/right. Increasing j1+j2 extends horizontal reach forward; coordinate small j1/j2/j3 adjustments to keep the brick level and move straight horizontally into the socket.
+- Yaw geometry (critical): the brick starts pointing away from the rail (0 deg), while the vertical socket face faces right (90 deg / ~1.57 rad left of the brick's initial heading). Total horizontal turn `(right_j0 - pickup_j0) + abs(right_j4)` must reach ~1.57 rad so the prongs enter at 90 degrees—this typically requires right_j4 around -1.05 to -1.30 rad (approaching a middle station around right_j0 = +0.30 to +0.45 rad reduces required wrist yaw).
+- Keep right_j5 on the negative side (~ -1.05 to -1.65 rad) during alignment so the wrist camera stays on the prong side and both flat prongs are vertical (| |) to match the vertical slots.
+
+Execution
+1. Snug-to-Table Grasp
+- Open 0.90; deploy above the rear half of the brick with both prongs exposed ahead of the pads in right.
+- Do NOT close early based on right-view overlap alone (the brick looks centered even 5 cm above the mat). Lower until main view confirms the black pad tips touch/graze the mat surface OR measured arm lag exceeds 0.015 rad.
+- Stop lowering and immediately close right_gripper=0.0 in the NEXT call (a valid brick grasp reads back ~0.20–0.52; <0.03 means empty). Do NOT retreat before closing. If empty, lift clear (-j1) and open 0.90 BEFORE lowering again—never open and descend in the same call.
+- Lift a few centimetres (-j1) so the brick clears the mat, and verify both prongs remain cleanly exposed.
+
+2. Square & Level Alignment Over Target Slot Pair
+- If both prongs are already vertical and clearly exposed ahead of the pads, proceed directly to alignment rather than setting the brick down, even if it rests on its narrow edge.
+- Sweep and extend in clear space in front of the vertical socket face (aiming near a middle station around right_j0 = +0.30 to +0.45 rad), turning right_j4 (~ -1.05 to -1.30 rad) and rolling right_j5 (~ -1.05 to -1.65 rad) until:
+  (a) in right view, the white power strip face runs straight/horizontal across the image (NOT receding diagonally at an angle) and both vertical prong tips line up with your chosen vertical 2-prong slot pair; and
+  (b) in main view, the brick body and prongs are horizontal (0 deg level with the mat) and the brick front face is parallel to the vertical socket wall.
+
+3. Guarded Horizontal Insertion & Release
+- Hard gate before pushing: do NOT advance into the socket unless the strip face is squared across right view and the brick is level in main view.
+- Advance horizontally in small observed steps (0.02–0.04 rad in j1/j2, adjusting j0/j3 slightly to hold height and lateral centering), verifying true entry by decreasing exposed metal prong length in right view and closing brick-to-strip gap in main view.
+- Stop immediately if the brick tips in the pads without prong shortening, the strip shifts, or arm tracking lag exceeds 0.015 rad; back out slightly (-j1, -j2) to re-square before retrying. Never push through a stop.
+- Once the brick front face is seated flush against the vertical strip face, open right_gripper=0.90, withdraw straight back (-j1, -j2) clear of the brick, verify it stays seated in main/right, and call done. If no supported alignment remains, explain it in give_up.
+
+Attention & Notes
+- Every move_joints call MUST include attention: primary_view (main/left/right), fusion_mode (single_view/cross_view_parallel), and views with REQUIRED main,left,right keys.
+- Each view has visible and regions: use 1–3 regions when visible, [] when invisible/occluded/out of frame/masked. The primary view must be visible; cross_view_parallel needs two visible views.
+- Each region has label, center_uv=[u,v], box_uv=[umin,vmin,umax,vmax], weight. Use full original-image coordinates in [0,1], origin top-left; ordered positive-area boxes containing the center, weights >0 summing to 1 per visible view.
+- In note use 1–2 short sentences: what you see and what the move does. Attention is your reported evidence selection, not a claim about internal model attention.

@@ -252,6 +252,14 @@ class MotorChainRobot(Robot):
         if not zero_gravity_mode:
             # set current qpos as target pos with the default PD parameters
             self.command_joint_pos(self._joint_state.pos)
+        # Optional diagnostics are initialized before the update producer starts.
+        self._gripper_trace = None
+        if os.environ.get("YAM_GRIPPER_TRACE_DIR") and self._gripper_index is not None:
+            from i2rt.robots.gripper_trace import from_environment
+            try:
+                self._gripper_trace = from_environment(self)
+            except Exception:
+                logging.exception("Gripper diagnostic recorder could not start; control unchanged")
         # The first update must use the intended hold, never zero PD commands.
         self._server_thread.start()
 
@@ -361,7 +369,33 @@ class MotorChainRobot(Robot):
         """
         with self._command_lock:
             joint_commands = copy.deepcopy(self._commands)
+        trace = getattr(self, "_gripper_trace", None)
+        trace_due = trace is not None and trace.due()
+        trace_row = None
         with self._state_lock:
+            if trace_due:
+                try:
+                    i = self._gripper_index
+                    limits = self._gripper_limits
+                    span = float(limits[1] - limits[0])
+                    state = self._joint_state
+                    limiter = self._gripper_force_limiter
+                    trace_row = dict(sample_time_ns=time.time_ns(), sample_monotonic_ns=time.monotonic_ns(),
+                        feedback_source_time_ns=int(state.timestamp * 1e9),
+                        requested_target_raw_rad=float(joint_commands.pos[i]),
+                        requested_target_normalized=float((joint_commands.pos[i]-limits[0])/span),
+                        position_normalized=float(state.pos[i]),
+                        position_raw_rad=float(state.pos[i]*span+limits[0]),
+                        velocity_normalized_per_s=float(state.vel[i]),
+                        velocity_raw_rad_per_s=float(state.vel[i]*span),
+                        feedback_effort_nm=float(state.eff[i]),
+                        temp_mos_c=float(state.temp_mos[i]), temp_rotor_c=float(state.temp_rotor[i]),
+                        kp=float(joint_commands.kp[i]), kd=float(joint_commands.kd[i]),
+                        limiter_was_clogged=bool(limiter._is_clogged) if limiter else None)
+                except Exception as exc:
+                    trace.fail(exc)
+                    trace_due = False
+                    trace_row = None
             g = self._compute_gravity_compensation(self._joint_state)
             friction_comp = (
                 self._coulomb_friction * np.sign(self._joint_state.vel) if self.use_coulomb_friction else 0.0
@@ -389,6 +423,16 @@ class MotorChainRobot(Robot):
 
                     joint_commands.pos[self._gripper_index] = self._gripper_force_limiter.update(gripper_state)
 
+                if trace_due:
+                    try:
+                        trace_row['limiter_target_raw_rad'] = float(joint_commands.pos[self._gripper_index])
+                        trace_row['limiter_is_clogged'] = bool(self._gripper_force_limiter._is_clogged) if self._gripper_force_limiter else None
+                        adjusted = self._gripper_force_limiter._gripper_adjusted_qpos if self._gripper_force_limiter else None
+                        trace_row['limiter_adjusted_raw_rad'] = None if adjusted is None else float(adjusted)
+                    except Exception as exc:
+                        trace.fail(exc)
+                        trace_due = False
+                        trace_row = None
                 # add final clip so the gripper won't be over-adjusted
                 joint_commands.pos[self._gripper_index] = np.clip(
                     joint_commands.pos[self._gripper_index],
@@ -409,6 +453,19 @@ class MotorChainRobot(Robot):
                 "feedforward_effort": motor_torques.copy(),
                 "motor_ids": [item[0] for item in getattr(self.motor_chain, "motor_list", [])],
             }
+            if trace_due:
+                try:
+                    trace_row['driver_target_raw_rad'] = float(joint_commands.pos[self._gripper_index])
+                    trace_row['endpoint_clipped'] = trace_row['driver_target_raw_rad'] != trace_row['limiter_target_raw_rad']
+                    trace_row['feedforward_effort_nm'] = float(motor_torques[self._gripper_index])
+                except Exception as exc:
+                    trace.fail(exc)
+                    trace_row = None
+        if trace_row is not None:
+            try:
+                trace.offer(trace_row)
+            except Exception as exc:
+                trace.fail(exc)
 
     def _update_joint_state(
         self,
@@ -612,7 +669,10 @@ class MotorChainRobot(Robot):
         """
         # update() replaces this complete snapshot; it never mutates a published one.
         # Do not wait for CAN I/O under the producer's state lock for diagnostics.
-        return copy.deepcopy(self._diagnostic_sample)
+        sample = copy.deepcopy(self._diagnostic_sample)
+        if sample is not None and getattr(self, "_gripper_trace", None) is not None:
+            sample['gripper_trace'] = self._gripper_trace.status()
+        return sample
 
     def get_recording_state(self) -> dict:
         """Copy one complete cached feedback sample under the producer's lock."""
@@ -695,6 +755,8 @@ class MotorChainRobot(Robot):
             self.motor_chain.rollback_initialization()
         else:
             self.motor_chain.close()
+        if getattr(self, "_gripper_trace", None) is not None:
+            self._gripper_trace.close()
         print("Robot closed with all torques set to zero.")
 
     def update_kp_kd(self, kp: np.ndarray, kd: np.ndarray) -> None:

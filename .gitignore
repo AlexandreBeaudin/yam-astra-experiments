@@ -12,6 +12,7 @@ __pycache__/
 *.key
 *.crt
 profiles/*.yaml
+/profiles/ps-leader-arms/
 *.local.json
 **/astra-yam3-run-*/
 **/.replay-render-*/
@@ -21,6 +22,11 @@ data/
 *.mcap
 *.bag
 *.bak
+
+# Generated plug-socket recordings and browser validation artifacts
+/integrations/inspect_robots/experiments/plug-socket/runs/
+/integrations/inspect_robots/experiments/plug-socket/human-runs/
+/output/playwright/
 
 # Generated report-transfer archives
 integrations/inspect_robots/YAM3_ASTRA_REPORT_BUNDLE/

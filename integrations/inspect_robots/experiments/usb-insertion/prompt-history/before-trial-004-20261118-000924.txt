@@ -1,0 +1,30 @@
+Task
+Use only the logical right arm (`right_j0`..`right_j5`, `right_gripper`) to pick up the loose USB-A cable and fully seat its metal plug into any of the four top-facing hub ports. Release and withdraw clear, leaving the plug seated. Keep the left arm at its initial pose.
+
+Controls and limits
+- Use `move_joints` with absolute targets in radians; omitted joints retain their targets. Per-call caps are `0.80 rad/joint` and `1.0` normalized gripper change, subject to planner and hardware guards.
+- Command `right_gripper` only within `0.0`–`0.90`. Use `0.0` for closed and `0.90` for opening, including release. NEVER command `1.0` or anything above `0.90`.
+- NEVER command `right_j3 < -1.65 rad`. Honor all other published limits and guards. Do not retry a target that caused a tracking stop.
+- Joint posture does not prove plug orientation. Treat local joint-motion effects as hypotheses to verify, not fixed geometric rules. Do not assume `j1 > j2` guarantees a vertical tip, that J1-only motion is vertical, or that a joint increment specifies centimetres.
+
+Views and evidence
+- Use `main` for overall geometry and clearance, `right` for pad/housing depth and tip/port detail, and `left` when it supplies an informative independent perspective. Wrist-camera rotation changes the image; image rotation alone does not establish improved alignment.
+- Separate direct observations from hypotheses. Assess these questions independently: housing placement between the pads at contact depth; plug insertion-axis direction; keyed rotation; and tip-to-port offset/gap. Mark unresolved questions as unknown. Do not infer alignment or contact from image overlap alone, or invent metric measurements from uncalibrated RGB views.
+
+Acquire an insertion-ready grasp
+- Choose housing sides that leave the metal tip exposed and visible, with a plausible port approach within joint limits. There is no fixed call quota for grasping.
+- Open to `0.90`. Before closing, identify evidence that the housing is between the pads at their contact depth, not merely centered in the image. If depth is unknown, use another informative view or a bounded clearance-preserving probe.
+- Close toward `0.0` without changing the arm pose simultaneously. Make a small, visually checked lift. Accept the grasp only if the plug lifts with the fingers and the metal tip stays visible; jaw closure alone is insufficient.
+- If the grasp misses, reopen to `0.90` and correct the identified error. If a lifted grasp hides the tip or prevents a feasible approach, set down with observed clearance and regrasp.
+
+Resolve alignment deliberately
+- Before each diagnostic move, state in `note`: the single uncertainty/offset, predicted visible effect, and evidence that would support or reject the prediction. Prefer an isolated change when learning motion effects; coupled transit moves remain available in visibly clear space.
+- Afterward, compare observation with prediction in the next note. Retain useful findings and rejected hypotheses. An unchanged-view observation recheck refreshes frames but does not necessarily resolve geometry.
+- Verify insertion-axis direction, keyed rotation and lateral centering separately while clear of the hub. Wrist roll does not necessarily correct axis tilt. Do not assume J4 must always stay zero.
+- After three consecutive probes fail to resolve the same question, change strategy: use an informative independent view or a clearance-checked set-down and regrasp. Do not repeat the sequence without new evidence. If no supported alternative remains, use `give_up` and explain the uncertainty and attempted alternatives.
+
+Insert and verify
+- Treat verified grasp, orientation, pre-insertion alignment, insertion and release as distinct stages. State the evidence for each transition. Do not use contact to discover an unknown insertion axis.
+- When tip direction, keyed orientation and centering are supported by the views, advance in small observed moves consistent with the insertion axis. Recheck fresh views and measured state after each move.
+- Stop advancing if the hub shifts, the plug bends/binds, or measured arm-joint lag exceeds `0.015 rad`. Lag warrants reassessment; it does not prove contact. Back out only with observed clearance and valid guards.
+- Once seated, open `right_gripper: 0.90`, withdraw clear, and verify that the plug remains seated before calling `done`. Report uncertain seating as unverified.

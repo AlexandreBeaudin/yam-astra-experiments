@@ -121,10 +121,21 @@ class Args:
     hardware_port: int = 6001
     safety_port: int = DEFAULT_SAFETY_PORT
     bootstrap_token: str | None = None
+    gripper_trace_dir: str | None = None
+    gripper_trace_hz: float = 250.0
 
 
 def main() -> int:
     args = tyro.cli(Args)
+    if args.gripper_trace_dir is not None:
+        import math
+        if not math.isfinite(args.gripper_trace_hz) or not 0 < args.gripper_trace_hz <= 1000:
+            raise ValueError('gripper trace rate must be > 0 and <= 1000 Hz')
+        directory = Path(args.gripper_trace_dir).resolve()
+        directory.mkdir(parents=True, exist_ok=True)
+        os.environ['YAM_GRIPPER_TRACE_DIR'] = str(directory)
+        os.environ['YAM_GRIPPER_TRACE_HZ'] = str(args.gripper_trace_hz)
+        print(f'Gripper diagnostics requested: {directory} (up to {args.gripper_trace_hz:g} Hz)', flush=True)
     config_paths = {
         "left": args.left_config_path,
         "right": args.right_config_path,

@@ -101,7 +101,9 @@ def read_rows(path):
     return rows, damaged
 
 
-def export_replay(root, *, title=None, harness_label="Inspect Robots"):
+def export_replay(root, *, title=None, harness_label="Inspect Robots", layout='auto'):
+    if layout not in ('auto', 'two', 'three'):
+        raise ValueError('replay layout must be auto, two or three')
     root = Path(root).resolve()
     events, damaged = read_rows(root / 'station-events.jsonl')
     legacy = None
@@ -128,7 +130,14 @@ def export_replay(root, *, title=None, harness_label="Inspect Robots"):
     for e in events:
         e.setdefault('time_s', (e.get('recorded_monotonic_ns', start) - start) / 1e9)
     calls = []
-    metadata, returns = {}, {}
+    metadata, returns = {'replay_layout': layout}, {}
+    attempt = root / 'attempt.json'
+    if attempt.exists():
+        manifest = json.loads(attempt.read_text())
+        # Select presentation fields only; never embed arbitrary manifest data.
+        metadata.update({key: manifest[key] for key in ('active_perception', 'mask_left_view', 'model') if key in manifest})
+        if manifest.get('reasoning_effort'):
+            metadata['effort'] = manifest['reasoning_effort']
     for path in sorted((root / 'records').rglob('record.json')):
         record = json.loads(path.read_text())
         config = record.get('configuration', {}).get('policy', {}).get('config', {})
@@ -174,5 +183,6 @@ def export_replay(root, *, title=None, harness_label="Inspect Robots"):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-dir', type=Path, required=True)
+    parser.add_argument('--layout', choices=['auto', 'two', 'three'], default='auto')
     args = parser.parse_args()
-    print(export_replay(args.run_dir))
+    print(export_replay(args.run_dir, layout=args.layout))

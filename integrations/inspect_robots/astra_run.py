@@ -39,7 +39,10 @@ from inspect_robots.guard import ClampGuard, DeltaLimitGuard, GuardChain, _GUARD
 from inspect_robots.errors import SafetyAbort
 from inspect_robots.tools import Tool, ToolLibrary, ToolResult
 from planned_motion import goal_tools, pose_tool_available
-from experiment_resume import atomic_json, install_checkpoint, load_resume, validate_pose
+from experiment_resume import atomic_json, install_checkpoint, load_resume, validate_pose, validate_observer_guard
+from experiment_budgets import MAX_CALLS, MAX_SECONDS, MAX_STEPS
+from observer_separation import load_guard
+from attention_contract import attention_schema, validate_attention
 
 
 def motion_guard(space):
@@ -65,15 +68,30 @@ class PauseOnIntervention:
 PROFILE = ROOT / 'profiles/shurui-mcap.yaml'
 PROMPT = HERE / 'astra_exploration.txt'
 URL = 'https://api.rhos.cc/v1/responses'
+MODEL = 'gpt-6.2-astra'
+REASONING_EFFORT = 'medium'
 LABELS = tuple(f'right_j{i}' for i in range(6)) + ('right_gripper',)
 MODEL_TIMEOUT_S = 600.
 MODEL_ATTEMPTS = 4  # Total attempts, including the first request.
-MAX_CALLS = 180
-MAX_SECONDS = 2400
-MAX_STEPS = 5400
 MAX_MOVE_RAD = 0.80  # Per-call ceiling; use fine steps near contact. Interpolation unchanged.
 MAX_GRIPPER_DELTA = 1.0
 APPROACH_MOVE_RAD = 0.80  # Optional attended path review uses the same ceiling.
+STAGED_OBSERVER_TRIALS = (7, 8, 9, 10)
+MULTI_VIEW_OBSERVER_TRIALS = (9, 10)
+STAGED_OBSERVER_MINIMUM_SEPARATION_M = .09
+STAGED_OBSERVER_MARGIN_M = .015
+TRIAL10_MINIMUM_SEPARATION_M = .0585
+OBSERVER_INIT_TOLERANCE_RAD = .008
+# Replace these six radians (left_j0..left_j5) with the next calibrated wrist pose.
+# Source: left-wrist-20261122-013244-281376.json, can_follower_l.
+LEFT_OBSERVER_INIT_JOINTS = (
+    0.12340733958953187, 2.454222934309911, 1.1045624475471119,
+    1.354810406652934, 1.3410772869459073, 0.09250782024872173,
+)
+SAVED_OBSERVER_POSES = {
+    9: HERE / 'experiments/plug-socket/trial9-left-wrist-20261122-032518-338907.json',
+    10: HERE / 'experiments/plug-socket/trial10-left-wrist-20261122-040939-660496.json',
+}
 MOTION_PHASES = ('open_space_approach', 'alignment', 'descent', 'grasp', 'placement', 'fine')
 OBSERVATION_GUIDANCE = (
     'Use right for approach depth relative to the finger pads and XY centering; '
@@ -108,15 +126,41 @@ USB_MOVE_DESCRIPTION = (
 )
 
 
-def task_configuration(task_id='pick-place'):
+def task_configuration(task_id='pick-place', *, active_perception=False, mask_left_view=None, observer_trial=None):
+    if task_id == 'plug-socket':
+        root = HERE / 'experiments/plug-socket'
+        instruction = ('Use the right arm to grasp the rear half of the charger brick and seat both flat prongs '
+            'in any of the eight parallel two-prong slot pairs on the unplugged white power strip. '
+            'Release and withdraw clear. ')
+        masked = not active_perception if mask_left_view is None else mask_left_view
+        instruction += ('Use left_j0..left_j5 as an observer camera boom; preserve the left gripper opening.'
+            if active_perception else 'Keep the left arm parked; left is masked, and main/right are the active views.' if masked else 'Keep the left arm parked; main, left and right views are available (mask explicitly disabled).')
+        prompt_name = 'prompt-active-perception.txt' if active_perception else 'prompt.txt'
+        if observer_trial is not None:
+            prompt_name = f'prompt{observer_trial}.txt'
+            instruction = ('Use the right arm to insert both prongs of the charger brick fully into an upper '
+                'two-prong socket on the unplugged, braced power strip. Release and withdraw clear. '
+                'Use the pre-positioned left wrist for the side view and keep its gripper open.')
+            if observer_trial in MULTI_VIEW_OBSERVER_TRIALS:
+                instruction += ' Move the left wrist to additional viewpoints during fine alignment.'
+        return dict(id=task_id, active_perception=active_perception,
+            prompt=root / prompt_name,
+            output_root=root / 'runs', output_prefix='run-', scene_id='yam3-plug-socket-one-episode',
+            task_name='yam3-plug-socket', title='Charger brick plug-in-socket insertion', instruction=instruction)
     if task_id == 'usb-insertion':
         root = HERE / 'experiments/usb-insertion'
-        return dict(id=task_id, prompt=root / 'prompt.txt', output_root=root / 'runs',
+        spec = dict(id=task_id, active_perception=active_perception, prompt=root / ('prompt-active-perception.txt' if active_perception else 'prompt.txt'), output_root=root / 'runs',
             output_prefix='run-', scene_id='yam3-usb-insertion-one-episode',
             task_name='yam3-usb-insertion', title='USB-A cable insertion', instruction=
             "Use only YAM3's logical right arm to pick up the loose cable and fully seat its "
             "USB-A plug in any one of the four ports on the hub. Leave the plug seated with "
-            "the gripper clear. Keep the left arm at its initial pose.")
+            "the gripper clear. " + ("Use the left arm as an auxiliary observer camera; keep its gripper at its initial opening."
+            if active_perception else "Keep the left arm at its initial pose."))
+        if active_perception:
+            spec['instruction'] = ('Use the right arm to pick up the loose USB-A cable and seat its plug in a top-facing hub port. '
+                'Use left_j0..left_j5 to position the left eye-in-hand observer camera for depth and plug-angle views; '
+                'keep the left gripper at its initial opening. Leave the plug seated with the right gripper clear.')
+        return spec
     if task_id != 'pick-place':
         raise ValueError(f'Unknown task: {task_id}')
     return dict(id=task_id, prompt=PROMPT, output_root=HERE, output_prefix='astra-yam3-run-',
@@ -149,7 +193,7 @@ def station_motion_tools(library, arm):
                 'For contact, explain why a small upward withdrawal or reversal cannot '
                 'safely separate the pad before re-centering. Contact alone is not terminal; '
                 'all hardware guards remain authoritative.')
-            if arm.task_id == 'usb-insertion':
+            if arm.task_id in ('usb-insertion', 'plug-socket'):
                 reason = schema['function']['parameters']['properties']['reason']
                 reason['description'] = reason['description'].replace(
                     'small upward withdrawal or reversal', 'clear insertion-axis back-out or reversal')
@@ -159,15 +203,29 @@ def station_motion_tools(library, arm):
             tools.append(tool)
             continue
         schema = copy.deepcopy(tool.schema)
-        schema['function']['description'] += (USB_MOVE_DESCRIPTION if arm.task_id == 'usb-insertion' else MOVE_DESCRIPTION) + ' Current station allowance: ' + arm.motion_allowance()
+        schema['function']['description'] += (arm.action_guidance() if arm.active_perception or arm.task_id == 'plug-socket' else USB_MOVE_DESCRIPTION if arm.task_id == 'usb-insertion' else MOVE_DESCRIPTION) + ' Current station allowance: ' + arm.motion_allowance()
         schema['function']['parameters']['properties']['phase'] = {
             'type': 'string', 'enum': list(MOTION_PHASES),
             'description': 'Optional stage label; all phases share the per-call ceiling.'}
+
+        if arm.task_id == 'plug-socket':
+            parameters = schema['function']['parameters']
+            parameters['properties']['attention'] = attention_schema()
+            parameters['required'] = list(dict.fromkeys(parameters.get('required', []) + ['attention']))
 
         def move(args, observation, original=tool.run):
             phase = args.get('phase', 'fine')
             if phase not in MOTION_PHASES:
                 return ToolResult(error='invalid motion phase')
+            if arm.task_id == 'plug-socket':
+                try:
+                    validate_attention(args.get('attention'), masked_views={'left'} if arm.mask_left_view else set())
+                except ValueError as exc:
+                    return ToolResult(error='invalid attention: ' + str(exc))
+                arm.record(dict(kind='attention_distribution', step=arm.t, phase=phase,
+                    targets=copy.deepcopy(args.get('targets')), note=args.get('note'),
+                    attention=copy.deepcopy(args['attention'])))
+                args = {key: value for key, value in args.items() if key != 'attention'}
             prior = arm.motion_phase
             arm.motion_phase = phase
             try:
@@ -195,7 +253,8 @@ class StationPolicy(LLMAgentPolicy):
                 'parameters': {'type': 'object', 'properties': {'note': {'type': 'string'}},
                                'required': ['note'], 'additionalProperties': False}}},
                 self._recheck)]))
-            self.bind_tools(goal_tools(self.station))
+            if not self.station.active_perception:
+                self.bind_tools(goal_tools(self.station))
             self._adapter._tools = station_motion_tools(self._adapter.tools, self.station)
 
     def reset(self, scene):
@@ -209,9 +268,12 @@ class StationPolicy(LLMAgentPolicy):
             # before any new decision. No saved action chunk is replayed.
             self._messages = copy.deepcopy(state['messages'])
             self._messages.append(dict(role='user', content=
-                'Experiment resumed after interruption at an unanswered model request. '
+                'Experiment resumed after interruption. Any interrupted move is described in history. '
                 'Prior actions are already executed. Do not replay them. The next '
-                'observation is fresh; reassess the current scene before choosing a new action.'))
+                'observation is fresh; reassess the current scene before choosing a new action. '
+                'Right-arm action bounds now use nominal model limits instead of the SDK expanded limits. '
+                'If the starting wrist is just outside a nominal bound, move inward with observed clearance. '
+                'Never repeat a target that caused a tracking stop.'))
             self._client._raw_items_by_call_id = copy.deepcopy(state['raw_items'])
             self._calls_used = state['calls_used']
             self._delta_cursor = 0
@@ -233,7 +295,7 @@ class StationPolicy(LLMAgentPolicy):
         if self.station is not None:
             # Refresh the tool's allowance as well as observation text; approval
             # can expire or be consumed after the policy was bound.
-            available_goals = {tool.name for tool in goal_tools(self.station)}
+            available_goals = set() if self.station.active_perception else {tool.name for tool in goal_tools(self.station)}
             self._adapter._tools = ToolLibrary([
                 replace(tool, schema={**tool.schema, 'function': {
                     **tool.schema['function'], 'description':
@@ -309,12 +371,17 @@ class GatewayTransport(httpx.BaseTransport):
 
 
 def make_policy(transport, pre_check, *, env=None, station=None, resume_state=None,
-                timeout_s=MODEL_TIMEOUT_S, model_attempts=MODEL_ATTEMPTS, prompt_path=None):
-    policy = StationPolicy(station=station, resume_state=resume_state, model='gpt-6-astra', base_url='https://api.rhos.cc/v1',
-        api_key_env='RHOS_API_KEY', wire='responses', effort='medium',
+                timeout_s=MODEL_TIMEOUT_S, model_attempts=MODEL_ATTEMPTS, prompt_path=None,
+                model=MODEL, reasoning_effort=REASONING_EFFORT):
+    brief = (prompt_path or PROMPT).read_text()
+    if station is not None and station.task_id == 'plug-socket' and not station.active_perception and not station.mask_left_view:
+        brief = brief.replace('Only main and right are active. left is parked and MASKED; report left visible=false, regions=[].',
+            'Main, left and right are active; left masking was explicitly disabled. The left arm stays parked.')
+    policy = StationPolicy(station=station, resume_state=resume_state, model=model, base_url='https://api.rhos.cc/v1',
+        api_key_env='RHOS_API_KEY', wire='responses', effort=reasoning_effort,
         max_llm_calls=MAX_CALLS, max_retries=model_attempts, timeout_s=timeout_s,
         images='always', image_horizon=3, depth='off', max_speed_frac=0.1,
-        eval_notes=(prompt_path or PROMPT).read_text(), transport=transport, pre_check=pre_check,
+        eval_notes=brief, transport=transport, pre_check=pre_check,
         transcript_echo=True, env=env)
     # The pinned plugin enables optional explicit cache extensions for GPT-6.
     # RHOS has only been exercised with standard Responses fields here. Keep
@@ -330,6 +397,26 @@ def checked_vector(value, shape):
     return array.copy()
 
 
+def observer_minimum_separation_m(observer_trial):
+    if observer_trial == 10:
+        return TRIAL10_MINIMUM_SEPARATION_M
+    return STAGED_OBSERVER_MINIMUM_SEPARATION_M if observer_trial is not None else .14
+
+
+def validate_plug_observer_guard(guard, *, observer_trial):
+    descriptor = guard.describe()
+    minimum = descriptor.get('minimum_separation_m', 0.)
+    margin = descriptor.get('margin_m', 0.)
+    staged_observer = observer_trial is not None
+    minimum_allowed = observer_minimum_separation_m(observer_trial)
+    threshold = minimum_allowed + STAGED_OBSERVER_MARGIN_M if staged_observer else .16
+    if (descriptor.get('mode') != 'registered_fk_wrist_gripper'
+            or not descriptor.get('metric_separation_verified')
+            or minimum + margin < threshold
+            or staged_observer and (minimum < minimum_allowed or margin < STAGED_OBSERVER_MARGIN_M)):
+        raise ValueError(f'plug-socket observer requires registered FK separation >= {threshold:g} m')
+
+
 def camera_freshness(acquisition, frame_id, received):
     if acquisition is not None:
         age = (received - acquisition) / 1e9
@@ -339,12 +426,31 @@ def camera_freshness(acquisition, frame_id, received):
 
 
 class StationArm:
-    """Expose only seven right-arm dimensions; left setpoint stays fixed.
+    """Expose right-only control by default, or opt-in left observer plus right manipulation.
 
     Injected RPC/preview objects make the actual adapter testable without sockets.
-    reset is observational: it never homes, calibrates or parks either arm.
+    Reset observes the station and can position the left observer for a fresh staged trial.
     """
-    def __init__(self, robot, preview, status, *, session=None, deadline=None, simulated=False, path_clearance_check=None, pose_planner=None, pose_inputs_available=False, task_id='pick-place'):
+    def __init__(self, robot, preview, status, *, session=None, deadline=None, simulated=False, path_clearance_check=None, pose_planner=None, pose_inputs_available=False, task_id='pick-place', active_perception=False, separation_guard=None, mask_left_view=None, observer_trial=None):
+        self.mask_left_view = (task_id == 'plug-socket' and not active_perception) if mask_left_view is None else bool(mask_left_view)
+        if active_perception and self.mask_left_view:
+            raise ValueError('active observer mode needs the unmasked left view')
+        self.active_perception = active_perception
+        self.control_mode = 'active_perception' if active_perception else 'right_only'
+        self.indices = np.r_[0:6,7:14] if active_perception else np.arange(7,14)
+        self.labels = (tuple(f'left_j{i}' for i in range(6)) + LABELS) if active_perception else LABELS
+        self.dim = len(self.labels)
+        self.arm_indices = np.arange(self.dim-1)
+        self.gripper_index = self.dim-1
+        self.step_limits = np.array([.003]*(self.dim-1)+[.02])
+        self.separation_guard = (separation_guard or load_guard()) if active_perception else None
+        self.observer_trial = observer_trial
+        staged_observer = observer_trial is not None
+        self.observer_init_joints = None
+        if staged_observer and (task_id != 'plug-socket' or not active_perception or not self.separation_guard.ready):
+            raise ValueError(f'Trial {observer_trial} requires the active plug-socket observer and registered geometry')
+        if task_id == 'plug-socket' and active_perception and self.separation_guard.ready:
+            validate_plug_observer_guard(self.separation_guard, observer_trial=observer_trial)
         self.task_id = task_id
         self.robot, self.preview, self.session = robot, preview, session
         self.deadline = deadline
@@ -352,6 +458,8 @@ class StationArm:
         # continuous swept arm/fingers against table, objects and stationary
         # left arm, with tracking uncertainty, for this exact path.
         # Optional attended review records and tracks an exact approach path.
+        if active_perception and (path_clearance_check is not None or pose_planner is not None or pose_inputs_available):
+            raise ValueError('observer mode cannot reuse right-only pose or swept-path helpers')
         self.path_clearance_check = path_clearance_check
         self.verified_approach = None
         self.motion_phase = 'fine'
@@ -364,20 +472,22 @@ class StationArm:
         limits = np.asarray(status['joint_limits'], dtype=float)
         if limits.shape != (14, 2) or not np.all(np.isfinite(limits)):
             raise ValueError('daemon must publish finite 14x2 joint limits')
-        low, high = limits[7:, 0].copy(), limits[7:, 1].copy()
-        low[6], high[6] = 0., 1.
+        low, high = limits[self.indices, 0].copy(), limits[self.indices, 1].copy()
+        # The normalized range includes held readback near the fully open endpoint.
+        # pre_check and dispatch_waypoint enforce the tighter limit on commanded openings.
+        low[-1], high[-1] = 0., 1.
         if np.any(low >= high):
             raise ValueError('invalid daemon limits')
-        self.space = Box((7,), low=low, high=high, semantics=ActionSemantics(
-            control_mode='joint_pos', gripper='continuous', dim_labels=LABELS,
-            max_step=(0.003,) * 6 + (0.02,)))
+        self.space = Box((self.dim,), low=low, high=high, semantics=ActionSemantics(
+            control_mode='joint_pos', gripper='continuous', dim_labels=self.labels,
+            max_step=tuple(self.step_limits)))
         self.info = EmbodimentInfo(name='yam3-existing-daemon-right',
             action_space=self.space, control_hz=30., is_simulated=simulated,
             capabilities=frozenset({'self_paced'}),
             observation_space=ObservationSpace(
                 cameras=(CameraSpec('main', 480, 640), CameraSpec('left', 480, 640), CameraSpec('right', 480, 640),
                          CameraSpec('main_comparison', 366, 1280)),
-                state=StateSpec((StateField('joint_pos', (7,), 'rad'),))),
+                state=StateSpec((StateField('joint_pos', (self.dim,), 'rad'),))),
             docs='Right joints J0-J5 in radians; right_gripper normalized 1=open, 0=closed. '
                 'Left has no exposed action dimensions. No camera calibration. '
                 'Preview acquisition times/IDs unknown. Only supervised visual exploration. '
@@ -387,6 +497,17 @@ class StationArm:
                 'Left has no exposed action dimensions. No camera calibration. '
                 'Never invent a plug or port pose from pixels.',
             environment_id='YAM3', morphology='yam-pro-existing-safety-daemon')
+        if active_perception:
+            self.info = replace(self.info, name='yam-observer-and-right-manipulator',
+                docs='Left joints left_j0..left_j5 position the eye-in-hand observer camera (left view). '
+                'Left gripper is inaccessible and remains at its initial opening. Right joints right_j0..right_j5 '
+                'and right_gripper manipulate. Right opening maximum 0.90. Both arms share bounds, caps, '
+                'interpolation and tracking checks. Separation guard: '+json.dumps(self.separation_guard.describe()))
+        if task_id == 'plug-socket':
+            self.info = replace(self.info, observation_space=ObservationSpace(
+                cameras=(CameraSpec('main', 480, 640), CameraSpec('left', 480, 640), CameraSpec('right', 480, 640)),
+                state=StateSpec((StateField('joint_pos', (self.dim,), 'rad'),))),
+                docs=self.info.docs + ' ' + self.observation_guidance())
         self.events = []
         self.last = None
         self.journal = None
@@ -406,11 +527,19 @@ class StationArm:
         if self.session:
             self.session.check()
 
+    def full_target(self, target):
+        full = self.initial.copy()
+        full[self.indices] = checked_vector(target, (self.dim,))
+        return full
+
+    def tracking_error(self, position):
+        return float(np.max(np.abs(np.asarray(position)[self.arm_indices] - self.last[self.arm_indices])))
+
     def reset(self, scene, *, seed=None):
         self.check()
         self.scene, self.t = scene, 0
         self.initial = checked_vector(self.robot.get_joint_state(), (14,))
-        self.last = self.initial[7:].copy()
+        self.last = self.initial[self.indices].copy()
         if self.verified_approach is not None:
             approval = self.verified_approach
             if np.max(np.abs(self.initial - approval.initial)) > .008:
@@ -426,9 +555,63 @@ class StationArm:
             self.last = np.asarray(state['target']).copy()
             self.t = state['step']
             self.rechecks = state['rechecks']
+        if self.active_perception:
+            self.separation_guard.reset(self.initial)
+            self.record(dict(kind='observer_guard', **self.separation_guard.describe()))
+        if self.observer_init_joints is not None and getattr(self, 'resume_state', None) is None:
+            self.position_left_observer()
         self.previous_decision = None
         self._approved_path = []
         return self.observe()
+
+    def observer_init_waypoints(self, joints):
+        if self.observer_trial is None:
+            raise RuntimeError('observer initialization requires a staged plug-socket trial')
+        if self.initial[6] < .95:
+            raise SafetyAbort(f'Trial {self.observer_trial} needs the left gripper staged open before initialization')
+        target = self.last.copy()
+        target[:6] = checked_vector(joints, (6,))
+        delta = np.abs(target - self.last)
+        outside = np.flatnonzero((target < self.space.low) | (target > self.space.high))
+        if outside.size:
+            details = ', '.join(f'{self.labels[i]}={target[i]:.5f} '
+                                f'(allowed [{self.space.low[i]:.5f}, {self.space.high[i]:.5f}])'
+                                for i in outside)
+            raise SafetyAbort(f'Trial {self.observer_trial} observer initialization target is outside station limits: {details}')
+        if np.max(delta) > MAX_MOVE_RAD:
+            raise SafetyAbort(f'Stage the left arm closer to the saved pose before starting Trial {self.observer_trial}')
+        if np.max(delta) <= OBSERVER_INIT_TOLERANCE_RAD:
+            points = self.last[np.newaxis, :]
+        else:
+            count = int(np.ceil(np.max(delta / self.step_limits)))
+            points = np.linspace(self.last, target, count + 1)[1:]
+        if reason := self.pre_check(points):
+            raise SafetyAbort(f'Trial {self.observer_trial} observer initialization rejected: {reason}')
+        return points
+
+    def position_left_observer(self):
+        if self.session is None:
+            raise RuntimeError('observer initialization requires an active supervised motion session')
+        points = self.observer_init_waypoints(self.observer_init_joints)
+        moved = not np.array_equal(self.last, points[-1])
+        self.record(dict(kind='observer_init_start', step=0, target=list(self.observer_init_joints),
+                         left_gripper=self.initial[6], waypoints=len(points) if moved else 0))
+        if moved:
+            for point in points:
+                self.dispatch_waypoint(point, initializing=True)
+        deadline = time.monotonic() + 3.
+        desired = np.asarray(self.observer_init_joints)
+        while True:
+            sample = self.measured_feedback()
+            position = np.asarray(sample['position'])[:6]
+            if np.max(np.abs(position - desired)) <= OBSERVER_INIT_TOLERANCE_RAD:
+                break
+            if time.monotonic() >= deadline or self.tracking_error(sample['position']) > .08:
+                raise SafetyAbort(f'Trial {self.observer_trial} left observer did not settle at the saved pose')
+            time.sleep(.05)
+        self.initial = self.full_target(self.last)
+        self.record(dict(kind='observer_init_complete', step=0, measured_left_joints=position.tolist(),
+                         left_gripper=self.initial[6], moved=moved))
 
     def decision_observation(self, rollout_observation):
         """Hold the existing setpoint, then obtain paired images/readback.
@@ -445,7 +628,7 @@ class StationArm:
             # Even a small residual is not proof of mechanical settling.
             for _ in range(61):
                 sample = self.measured_feedback()
-                residual = float(np.max(np.abs(np.asarray(sample['position'])[:6] - self.last[:6])))
+                residual = self.tracking_error(sample['position'])
                 if residual > .08:
                     raise RuntimeError('arm tracking residual exceeds 0.08 rad at decision boundary')
                 elapsed = time.monotonic() - started
@@ -456,7 +639,7 @@ class StationArm:
                 time.sleep(.05)
         fresh = self.observe()
         measured = np.asarray(fresh.state['joint_pos'])
-        residual = float(np.max(np.abs(measured[:6] - self.last[:6])))
+        residual = self.tracking_error(measured)
         if residual > .08:
             raise RuntimeError('arm tracking residual exceeds 0.08 rad at decision boundary')
         # Fixed display crop only: never used to infer geometry or choose motion.
@@ -483,15 +666,17 @@ class StationArm:
                 lines.append(f'{view} source frame ID changed: {changed}; source exposure metadata: {current_meta["freshness"]}')
             delta = measured - previous['measured']
             lines.append('Measured change since previous decision: ' + ', '.join(
-                f'{label}={value:+.5f}' for label, value in zip(LABELS, delta)))
+                f'{label}={value:+.5f}' for label, value in zip(self.labels, delta)))
             lines.append('JPEG content changed since previous decision: ' + ', '.join(
                 f'{view}={fresh.extra["cameras"][view]["sha256"] != previous["hashes"][view]}'
                 for view in ('main', 'right')) + '. Content change alone is not exposure freshness or useful motion.')
+        if self.task_id == 'plug-socket':
+            lines = [line for line in lines if not line.startswith('main_comparison is a derived display')]
         # Preserve rollout metadata, but replace stale sensor fields with refresh.
         extra = {**rollout_observation.extra, **fresh.extra,
                  'motion_report': {'lines': lines}, 'decision_observation': True}
-        images = {**fresh.images, 'main_comparison': comparison}
-        if self.journal is not None:
+        images = fresh.images if self.task_id == 'plug-socket' else {**fresh.images, 'main_comparison': comparison}
+        if self.journal is not None and self.task_id != 'plug-socket':
             output = io.BytesIO()
             Image.fromarray(comparison).save(output, format='JPEG')
             self.journal.frame('main_comparison', output.getvalue(), time.time_ns(),
@@ -503,9 +688,46 @@ class StationArm:
         return replace(fresh, images=images, extra=extra)
 
     def observation_guidance(self):
+        if self.observer_trial in MULTI_VIEW_OBSERVER_TRIALS:
+            return ('Use main for overall clearance, right for top-down prong and slot alignment, '
+                'and the initial left side view to check finger depth, prong height and insertion depth. '
+                'Use an upper two-prong socket nearer the left camera. Change the left viewpoint during '
+                'alignment, including a clear view from behind the brick, to check for tilt from multiple angles. '
+                + ('When close to the brick or socket, hold the right arm steady for small left-only viewpoint changes. '
+                   if self.observer_trial == 10 else '') +
+                'Report attention on every move_joints call; coordinates use the full original view, origin top-left.')
+        if self.observer_trial is not None:
+            return ('Use main for overall clearance, right for top-down prong and slot alignment, '
+                'and the pre-positioned left side profile for height, pitch and insertion depth. '
+                'Use an upper two-prong socket. Make only minor left adjustments if it leaves frame. '
+                'Report attention on every move_joints call; coordinates use the full original view, origin top-left.')
+        if self.task_id == 'plug-socket':
+            views = ('left is masked/disabled: only main and right are available. '
+                if self.mask_left_view else 'main, left and right are available. ')
+            return (views + 'Use main for lateral clearance; right for visible slot/prong alignment. '
+                'The wrist view can look horizontally when prongs are vertical; keep the insertion posture. '
+                + ('Left is the movable side-profile observer. ' if self.active_perception else '')
+                + 'Keep both prongs visible beyond the pads; avoid the angled three-prong slots. '
+                'Report attention on every move_joints call; coordinates use the full original view, origin top-left.')
+        if self.active_perception:
+            return (USB_OBSERVATION_GUIDANCE + ' Left is the eye-in-hand observer camera on left_j0..left_j5. '
+                'Use its oblique view for depth and plug angle; confirm clearance in main. '+json.dumps(self.separation_guard.describe()))
         return USB_OBSERVATION_GUIDANCE if self.task_id == 'usb-insertion' else OBSERVATION_GUIDANCE
 
     def action_guidance(self):
+        if self.task_id == 'plug-socket':
+            grasp = ('Before closing, verify that the finger bottoms are level with the bottom of the brick; '
+                     'both prongs must extend past the pads. ' if self.observer_trial in MULTI_VIEW_OBSERVER_TRIALS else
+                     'Grasp the rear rim; both prongs must extend past the pads. ')
+            return ('Absolute named ' + ', '.join(self.labels) + '. Omitted targets hold. '
+                'Right gripper 0=closed, maximum opening 0.90; left gripper fixed. '
+                '0.80 rad/joint per call, 0.003 rad per waypoint; 0.08 rad arm tracking guard. '
+                + grasp + self.observation_guidance())
+        if self.active_perception:
+            return ('Absolute named left_j0..left_j5 and right_j0..right_j5 targets; right_gripper 0=closed, '
+                'maximum opening 0.90. Omitted targets hold. Left gripper stays fixed at its initial opening. '
+                'Both arms: 0.80 rad/joint per call, 0.003 rad per waypoint, and 0.08 rad tracking guard. '
+                'The left arm is an observer camera boom. '+self.observation_guidance())
         if self.task_id == 'usb-insertion':
             return USB_MOVE_DESCRIPTION.strip()
         if pose_tool_available(self):
@@ -538,8 +760,10 @@ class StationArm:
         self._approved_path = []  # Clear even when a replacement plan is invalid.
         self._path_attended = False
         points = np.asarray(waypoints)
-        if self.last is None or points.ndim != 2 or points.shape[0] == 0 or points.shape[1] != 7 or not np.all(np.isfinite(points)):
+        if self.last is None or points.ndim != 2 or points.shape[0] == 0 or points.shape[1] != self.dim or not np.all(np.isfinite(points)):
             return 'invalid waypoints or no measured start'
+        if (self.active_perception or self.task_id == 'plug-socket') and points[-1,-1] > .90 + 1e-9 and abs(points[-1,-1]-self.last[-1]) > 1e-9:
+            return 'right gripper maximum commanded opening is 0.90 (initial opening may only hold or decrease)'
         delta = np.abs(points - self.last)
         cap, clearance = MAX_MOVE_RAD, 'unknown'
         if planned:
@@ -565,12 +789,29 @@ class StationArm:
                 cap, clearance = APPROACH_MOVE_RAD, 'attended_verified'
         self.record(dict(kind='move_allowance', phase=self.motion_phase,
                          cap_rad=cap, clearance=clearance,
-                         requested_rad=float(np.max(delta[:, :6]))))
-        if not planned and (np.any(delta[:, :6] > cap + 1e-9) or np.any(delta[:, 6] > MAX_GRIPPER_DELTA + 1e-9)):
+                         requested_rad=float(np.max(delta[:, self.arm_indices]))))
+        if not planned and (np.any(delta[:, self.arm_indices] > cap + 1e-9) or np.any(delta[:, -1] > MAX_GRIPPER_DELTA + 1e-9)):
             return (f'split the motion: maximum {cap} rad/joint and '
                     f'{MAX_GRIPPER_DELTA:.2f} gripper per move; clearance {clearance}. '
                     'Choose a target within these per-call limits.')
 
+        if self.active_perception:
+            if planned:
+                return 'active-perception mode exposes guarded move_joints only; right-only pose tools are unavailable'
+            full_path = np.vstack([self.full_target(self.last)] + [self.full_target(point) for point in points])
+            if reason := self.separation_guard.check_path(full_path):
+                certificate = getattr(self.separation_guard, 'last_check', None)
+                self.record(dict(kind='inter_arm_rejection', guard=self.separation_guard.mode, reason=reason,
+                    phase='trajectory_preflight',step=self.t, certificate=copy.deepcopy(certificate)))
+                if (self.observer_trial == 10 and certificate
+                        and certificate['min_sampled_distance_m'] is not None
+                        and certificate['min_sampled_distance_m'] < certificate['threshold_m']):
+                    closest = certificate['min_sampled_distance_m'] * 100
+                    required = certificate['threshold_m'] * 100
+                    return (f'{reason}. Closest modeled separation on the proposed path is {closest:.1f} cm; '
+                            f'need {required:g} cm. Hold the right arm and try a smaller left-only angle change, '
+                            'or retract the left arm for a wider approach before changing views.')
+                return reason
         # Dry-run the same bounds and delta guards with an isolated store.
         guard, store = motion_guard(self.space), {}
         guard.review(Action(data=self.last.copy()), store)
@@ -583,8 +824,8 @@ class StationArm:
                                  proposed=action.data.tolist(), approved=reviewed.data.tolist()))
                 raise SafetyAbort(cause)
         sample = self.measured_feedback()
-        measured = checked_vector(sample['position'], (7,))
-        if np.max(np.abs(measured[:6] - self.last[:6])) > .08:
+        measured = checked_vector(sample['position'], (self.dim,))
+        if self.tracking_error(measured) > .08:
             return 'measured arm is over 0.08 rad behind its setpoint; stop and inspect'
         if planned or clearance in ('verified', 'attended_verified'):
             self._approved_path = [point.copy() for point in points]
@@ -597,25 +838,41 @@ class StationArm:
         self.check()
         obsmod = observer_module()
         diagnostics = self.robot.get_diagnostics()
-        sample = obsmod.measured_right(diagnostics)
+        if self.active_perception:
+            followers = diagnostics.get('followers', diagnostics)
+            sides = {side: obsmod.measured_right({'right': followers.get(side)}) for side in ['left', 'right']}
+            for side, values in sides.items():
+                age = (time.time_ns() - values['source_time_ns']) / 1e9
+                if not 0 <= age <= .25:
+                    raise RuntimeError(f'{side} measured feedback is stale or clock is inconsistent')
+            sample = dict(source_time_ns=min(v['source_time_ns'] for v in sides.values()),
+                position=sides['left']['position'][:6]+sides['right']['position'])
+        else:
+            sample = obsmod.measured_right(diagnostics)
         age = (time.time_ns() - sample['source_time_ns']) / 1e9
         if not 0 <= age <= .25:
             raise RuntimeError('right measured feedback is stale or clock is inconsistent')
         joints = checked_vector(self.robot.get_joint_state(), (14,))
-        if np.max(np.abs(joints[:7] - self.initial[:7])) > .05:
-            raise RuntimeError('left arm/gripper drifted over its 0.05 tolerance; stop')
+        locked = [6] if self.active_perception else list(range(7))
+        if np.max(np.abs(joints[locked] - self.initial[locked])) > .05:
+            raise RuntimeError('locked left dimensions drifted over their 0.05 tolerance; stop' if self.active_perception else 'left arm/gripper drifted over its 0.05 tolerance; stop')
         return sample
 
     def check_model_wait(self):
         sample = self.measured_feedback()
-        if np.max(np.abs(np.asarray(sample['position'])[:6] - self.last[:6])) > .08:
+        if self.tracking_error(sample['position']) > .08:
             raise RuntimeError('arm tracking residual exceeds 0.08 rad during model wait')
 
     def observe(self):
         sample = self.measured_feedback()
         images, camera_meta = {}, {}
         for view in ('main', 'left', 'right'):
-            frame = self.preview.frame(view, 1.)
+            if view == 'left' and self.mask_left_view:
+                output = io.BytesIO()
+                Image.fromarray(np.zeros((480, 640, 3), dtype=np.uint8)).save(output, format='JPEG')
+                frame = (output.getvalue(), time.time_ns(), time.monotonic_ns(), {})
+            else:
+                frame = self.preview.frame(view, 1.)
             raw, wall, mono = frame[:3]
             source = frame[3] if len(frame) > 3 else {}
             acquisition = source.get('acquisition_time_ns')
@@ -632,7 +889,10 @@ class StationArm:
                 received_time_ns=wall, received_monotonic_ns=mono,
                 acquisition_time_ns=acquisition, frame_id=frame_id,
                 freshness=camera_freshness(acquisition, frame_id, wall))
-        measured = checked_vector(sample['position'], (7,))
+            if view == 'left' and self.mask_left_view:
+                images[view] = np.zeros((480, 640, 3), dtype=np.uint8)
+                camera_meta[view]['masked'] = True
+        measured = checked_vector(sample['position'], (self.dim,))
         report = {'lines': [
             self.observation_guidance(),
             self.motion_allowance(),
@@ -646,8 +906,16 @@ class StationArm:
              if self.task_id == 'pick-place' else
              'Grasp the plug housing with its metal tip exposed. Confirm visual lift before approaching the hub; align the tip and keyed orientation before small insertion-axis moves.'),
             'For plausible settling/frame delivery issues, use observation_recheck (at most two per motion). For geometric ambiguity, consider a different informative bounded probe with supported clearance. Missing metadata or one inconclusive recheck alone does not require stopping.',
-            f'Measured arm residual maximum: {float(np.max(np.abs(measured[:6] - self.last[:6]))):.5f} rad.',
+            f'Measured arm residual maximum: {self.tracking_error(measured):.5f} rad.',
         ]}
+        if self.task_id == 'plug-socket':
+            alignment = ('Grasp the rear rim with both prongs exposed; verify lift and use both wrist views to align '
+                         'the horizontal prongs with an upper two-prong socket.' if self.observer_trial is not None else
+                         'Grasp the rear rim with both prongs exposed; verify lift and align to one of eight parallel two-prong slot pairs.')
+            if self.observer_trial in MULTI_VIEW_OBSERVER_TRIALS:
+                alignment = ('Check finger depth in the left view before closing and check prong exposure in the right view. '
+                             'Verify lift, then use multiple left-camera angles and the right view to align the prongs.')
+            report['lines'] = [line.replace('Grasp the plug housing with its metal tip exposed. Confirm visual lift before approaching the hub; align the tip and keyed orientation before small insertion-axis moves.', alignment) for line in report['lines']]
         observation = Observation(images=images, state={'joint_pos': measured},
             instruction=self.scene.instruction, extra=dict(
                 observation_id=f'yam3-{self.t}', cameras=camera_meta,
@@ -658,12 +926,20 @@ class StationArm:
         return observation
 
     def step(self, action):
+        self.dispatch_waypoint(action.data)
+        return StepResult(observation=self.observe(), info={'accepted': True,
+            'measured_completion': None, 'physical_success': 'unverified'})
+
+    def dispatch_waypoint(self, point, *, initializing=False):
         self.check()
-        self.measured_feedback()  # Recheck source freshness before every dispatch.
-        target = checked_vector(action.data, (7,))
+        target = checked_vector(point, (self.dim,))
+        prefix = 'observer_init_' if initializing else ''
+        next_step = self.t if initializing else self.t + 1
+        if (self.active_perception or self.task_id == 'plug-socket') and target[-1] > .90 + 1e-9 and target[-1] > self.last[-1] + 1e-9:
+            raise RuntimeError('right gripper may not increase above 0.90')
         if np.any(target < self.space.low) or np.any(target > self.space.high):
             raise RuntimeError('target outside daemon limits')
-        if np.any(np.abs(target - self.last) > np.array([.003] * 6 + [.02]) + 1e-8):
+        if np.any(np.abs(target - self.last) > self.step_limits + 1e-8):
             raise RuntimeError('waypoint exceeds declared per-step change')
         if (self._approved_path and self._path_attended and self.verified_approach is not None
                 and self.verified_approach.used and time.monotonic() >= self.verified_approach.expires):
@@ -671,18 +947,43 @@ class StationArm:
         if self._approved_path and not np.array_equal(target, self._approved_path[0]):
             self._approved_path = []
             raise SafetyAbort('dispatch differs from clearance-checked path; pause for review')
-        full = np.concatenate((self.initial[:7], target))
+        # Compare fresh feedback with the last accepted setpoint, not the next
+        # waypoint. A blocked joint must stop the chunk before another RPC;
+        # checking only at the next policy decision lets the error accumulate.
+        sample = self.measured_feedback()
+        measured = checked_vector(sample['position'], (self.dim,))
+        errors = np.abs(measured[self.arm_indices] - self.last[self.arm_indices])
+        worst = int(np.argmax(errors))
+        if errors[worst] > .08:
+            cause = 'arm tracking residual exceeds 0.08 rad before waypoint dispatch'
+            self._approved_path = []
+            self.record(dict(kind='guard_intervention', phase='waypoint_tracking',
+                cause=cause, step=self.t, blocked_step=next_step,
+                joint=self.labels[worst], residual_rad=float(errors[worst]), limit_rad=.08,
+                measured_joints=measured.tolist(), reference_target=self.last.tolist(),
+                proposed_target=target.tolist(), measured_source_time_ns=sample['source_time_ns']))
+            raise RuntimeError(cause)
+        full = self.full_target(target)
+        if self.active_perception:
+            measured_full = checked_vector(self.robot.get_joint_state(), (14,))
+            if reason := self.separation_guard.check_path(np.vstack([measured_full, full])):
+                self.record(dict(kind='inter_arm_rejection', guard=self.separation_guard.mode, reason=reason,
+                    phase='waypoint_dispatch',step=self.t,blocked_step=next_step,
+                    measured_full_joints=measured_full.tolist(),proposed_full_target=full.tolist(),
+                    certificate=copy.deepcopy(getattr(self.separation_guard,'last_check',None))))
+                raise SafetyAbort(reason)
+
         start = time.monotonic()
         command_id = uuid.uuid4().hex
-        self.record(dict(kind='command_dispatch', command_id=command_id,
-            step=self.t + 1, target=full.tolist(), measured_completion=None))
+        self.record(dict(kind=prefix+'command_dispatch', command_id=command_id,
+            step=next_step, target=full.tolist(), measured_completion=None))
         self.check()  # Recheck deadline/session after synchronous disk writes.
         # A dispatch without acceptance remains uncertain after an interrupted RPC.
         acceptance = self.robot.command_joint_state(full)
         if not isinstance(acceptance, dict) or 'applied_joint_state' not in acceptance:
             raise RuntimeError('missing command acceptance')
         applied = checked_vector(acceptance['applied_joint_state'], (14,))
-        self.record(dict(kind='command_acceptance', command_id=command_id, step=self.t + 1,
+        self.record(dict(kind=prefix+'command_acceptance', command_id=command_id, step=next_step,
             target=full.tolist(), applied=applied.tolist(), accepted=True,
             limited=bool(acceptance.get('limited')),
             accepted_time_ns=acceptance.get('accepted_time_ns'), measured_completion=None))
@@ -692,12 +993,10 @@ class StationArm:
             self._approved_path.pop(0)
         self.last = target.copy()
         self.rechecks = 0
-        self.t += 1
+        self.t = next_step
         time.sleep(max(0., 1 / 30 - (time.monotonic() - start)))
-        self.record(dict(kind='motion_time', command_id=command_id, step=self.t,
+        self.record(dict(kind=prefix+'motion_time', command_id=command_id, step=self.t,
                          duration_s=time.monotonic() - start))
-        return StepResult(observation=self.observe(), info={'accepted': True,
-            'measured_completion': None, 'physical_success': 'unverified'})
 
     def close(self):
         pass  # The outer SupervisedMotionSession owns confirmed SAFE HOLD.
@@ -798,13 +1097,47 @@ class UnverifiedScorer:
         return Score(None, 'Operator must inspect post-release frames; model done is not independent success.')
 
 
+
+def nominal_station_status(status, current, *, side='right', command_reference=None):
+    """Constrain task targets for one arm to the configured nominal model.
+
+    Permit holding a starting pose at most .03 rad outside a nominal limit so
+    recovery can move inward. Never extend to the previously unreachable target.
+    This does not change daemon limits, motor configuration, or tracking guards.
+    """
+    import xml.etree.ElementTree as ET
+    from gello.robots.yam import YAMRobot
+    root = ET.parse(YAMRobot._arm_type().get_xml_path()).getroot()
+    nominal = np.array([list(map(float, root.find(f".//joint[@name='joint{i}']").attrib['range'].split()))
+                        for i in range(1, 7)])
+    joints = {'left': slice(0, 6), 'right': slice(7, 13)}[side]
+    pose = checked_vector(current, (14,))[joints]
+    outside = np.flatnonzero((pose < nominal[:, 0] - .03) | (pose > nominal[:, 1] + .03))
+    if outside.size:
+        details = ', '.join(f'J{i + 1}={pose[i]:.3f} rad (nominal [{nominal[i, 0]:.3f}, {nominal[i, 1]:.3f}])'
+                            for i in outside)
+        raise RuntimeError(f'Current {side} arm is more than 0.03 rad outside nominal model limits: {details}. '
+                           'Operator review required.')
+    reference = pose if command_reference is None else checked_vector(command_reference, (7,))[:6]
+    if np.max(np.abs(reference - pose)) > .008:
+        raise RuntimeError('restored command reference differs from live pose by more than 0.008 rad')
+    if np.any(reference < nominal[:, 0] - .03) or np.any(reference > nominal[:, 1] + .03):
+        raise RuntimeError('restored command reference outside recovery allowance')
+    result = copy.deepcopy(status)
+    limits = np.asarray(result['joint_limits'], dtype=float)
+    limits[joints, 0] = np.maximum(limits[joints, 0], np.minimum(nominal[:, 0], np.minimum(pose, reference)))
+    limits[joints, 1] = np.minimum(limits[joints, 1], np.maximum(nominal[:, 1], np.maximum(pose, reference)))
+    result['joint_limits'] = limits.tolist()
+    return result
+
+
 def execute(policy, arm, output, *, task_spec=None):
     spec = task_spec or task_configuration()
     scene = Scene(id=spec['scene_id'], instruction=spec['instruction'],
         metadata={'geometry_verified': False, 'calibration_required': False,
                   'grasp_example_required': False, 'episodes': 1, 'task_id': spec['id']})
     task = Task(name=spec['task_name'], scenes=[scene],
-                epochs=1, max_steps=MAX_STEPS - (getattr(arm, 'resume_state', None) or {}).get('step', 0), scorer=UnverifiedScorer())
+                epochs=1, max_steps=getattr(arm, 'max_total_steps', MAX_STEPS) - (getattr(arm, 'resume_state', None) or {}).get('step', 0), scorer=UnverifiedScorer())
     if arm.journal is None:
         arm.journal = EvidenceJournal(output)
     log = eval(task, policy, arm, guard=GuardChain(motion_guard(arm.space), PauseOnIntervention(arm)),
@@ -831,13 +1164,37 @@ def configuration():
     return profile, configs, channels
 
 
+def experiment_model(resume_source=None):
+    """Upgrade fresh trials; preserve the model tied to saved reasoning/history."""
+    if resume_source is None:
+        return MODEL, REASONING_EFFORT
+    manifest = Path(resume_source) / 'attempt.json'
+    saved = json.loads(manifest.read_text()) if manifest.exists() else {}
+    return saved.get('model', 'gpt-6-astra'), saved.get('reasoning_effort', 'medium')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--task', choices=['pick-place', 'usb-insertion'], default='pick-place',
+    parser.add_argument('--task', choices=['pick-place', 'usb-insertion', 'plug-socket'], default='pick-place',
         help='Task prompt, goal and recording namespace (default: pick-place)')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--check-station', action='store_true')
     mode.add_argument('--run', action='store_true')
+    parser.add_argument('--active-perception', action='store_true', help='Enable the left observer camera arm for USB or plug-socket insertion')
+    parser.add_argument('--mask-left-view', action=argparse.BooleanOptionalAction, default=None, help='Mask left observation; defaults on for right-only plug-socket. Override with --no-mask-left-view.')
+    parser.add_argument('--observer-geometry', type=Path, help='Verified registered bases or reviewed joint exclusion envelope JSON')
+    parser.add_argument('--max-total-steps', type=int, default=MAX_STEPS,
+        help=f'Cumulative motion-step budget including steps already used before resume (default: {MAX_STEPS})')
+    parser.add_argument('--recover-rejected-motion', action='store_true',
+        help='Recover a recorded waypoint rejection only when no command was dispatched')
+    parser.add_argument('--recover-separation-stop', action='store_true',
+        help='With observer --resume, reconcile an evidenced interpolation-certificate stop; request a fresh decision, never replay motion')
+    parser.add_argument('--recover-tracking-stop', action='store_true',
+        help='Reconcile a recorded decision-boundary tracking stop; never replay the failed target')
+    parser.add_argument('--tracking-stop-clearance-reviewed', action='store_true',
+        help='Operator visually checked the stopped arm, plug and cable and found no contact or binding')
+    parser.add_argument('--recover-interrupted-motion', action='store_true',
+        help='With --resume, reconcile a wall-clock interruption using recorded command evidence; never replay motion')
     parser.add_argument('--resume', type=Path, help='Resume an interrupted run directory; defaults to offline assessment')
     parser.add_argument('--model-timeout', type=float, default=MODEL_TIMEOUT_S, help='HTTP timeout in seconds (default: 600)')
     parser.add_argument('--model-attempts', type=int, default=MODEL_ATTEMPTS, help='Total attempts per model request (default: 4)')
@@ -851,40 +1208,119 @@ def main():
     parser.add_argument('--station-review-dir', type=Path,
         help='New directory for exact path JSON and all three camera images')
     args = parser.parse_args()
+    observer_trial = None
+    if args.resume:
+        try:
+            validate_resume_task(args.resume, args.task)
+            manifest = args.resume / 'attempt.json'
+            recorded = json.loads(manifest.read_text()) if manifest.is_file() else {}
+            observer_trial = next((number for number in STAGED_OBSERVER_TRIALS
+                                   if recorded.get(f'trial{number}') is True), None)
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
+    elif args.task == 'plug-socket' and args.attempt in STAGED_OBSERVER_TRIALS:
+        observer_trial = args.attempt
+    staged_observer = observer_trial is not None
+    if staged_observer and (args.task != 'plug-socket' or not args.active_perception):
+        parser.error(f'plug-socket Trial {observer_trial} requires --active-perception')
+    init_joints = LEFT_OBSERVER_INIT_JOINTS if staged_observer and not args.resume else None
+    if observer_trial in SAVED_OBSERVER_POSES and not args.resume:
+        try:
+            saved_pose = json.loads(SAVED_OBSERVER_POSES[observer_trial].read_text())
+            if (saved_pose['trial'] != observer_trial or saved_pose['channel'] != 'can_follower_l'
+                    or saved_pose['joint_names'] != [f'left_j{i}' for i in range(6)]):
+                raise ValueError(f'pose must identify Trial {observer_trial} and left_j0..left_j5 on can_follower_l')
+            init_joints = checked_vector(saved_pose['joint_positions_rad'], (6,)).tolist()
+        except (OSError, KeyError, ValueError, TypeError) as exc:
+            parser.error(f'invalid saved observer pose for Trial {observer_trial}: {exc}')
+    observer_metadata = {f'trial{observer_trial}': True, 'left_observer_init_joints': init_joints} if staged_observer else {}
+    if args.active_perception and args.task not in ('usb-insertion', 'plug-socket'):
+        parser.error('active perception is supported for usb-insertion and plug-socket')
+    mask_left = (args.task == 'plug-socket' and not args.active_perception) if args.mask_left_view is None else args.mask_left_view
+    if args.active_perception and mask_left:
+        parser.error('active observer mode requires the unmasked left view')
+    if args.task == 'plug-socket' and args.active_perception and args.observer_geometry is None:
+        name = ('ps-observer-geometry-trial10.json' if observer_trial == 10 else
+                'ps-observer-geometry-trial7.json' if staged_observer else 'ps-observer-geometry.json')
+        args.observer_geometry = HERE / 'experiments/plug-socket' / name
+    if args.observer_geometry and not args.active_perception:
+        parser.error('--observer-geometry requires --active-perception')
+    if args.active_perception and (args.approach_target is not None or args.recover_interrupted_motion or args.recover_tracking_stop or args.recover_rejected_motion):
+        parser.error('active perception does not reuse right-only attended paths or motion-recovery records; model-boundary resume is supported')
+    if args.recover_separation_stop and (not args.resume or not args.active_perception
+            or args.recover_interrupted_motion or args.recover_tracking_stop or args.recover_rejected_motion):
+        parser.error('--recover-separation-stop requires --resume --active-perception and no other recovery mode')
+    try:
+        separation = load_guard(args.observer_geometry,
+            minimum_allowed=observer_minimum_separation_m(observer_trial)) if args.active_perception else None
+        if staged_observer and not separation.ready:
+            raise ValueError(f'Trial {observer_trial} requires registered observer geometry')
+        if args.task == 'plug-socket' and separation is not None and separation.ready:
+            validate_plug_observer_guard(separation, observer_trial=observer_trial)
+    except (ValueError, OSError) as exc:
+        parser.error(f'invalid observer geometry: {exc}')
+    if args.recover_rejected_motion and (not args.resume or args.recover_tracking_stop or args.recover_interrupted_motion):
+        parser.error('--recover-rejected-motion requires --resume and no other recovery mode')
+    if args.recover_tracking_stop and (not args.resume or args.recover_interrupted_motion):
+        parser.error('--recover-tracking-stop requires --resume and cannot combine with --recover-interrupted-motion')
+    if args.run and args.recover_tracking_stop and not args.tracking_stop_clearance_reviewed:
+        parser.error('tracking-stop recovery requires --tracking-stop-clearance-reviewed after physical inspection')
+    if args.recover_interrupted_motion and not args.resume:
+        parser.error('--recover-interrupted-motion requires --resume')
     if args.resume and args.approach_target is not None:
         parser.error('resume cannot inherit or add an attended approach authorization')
     if args.approach_target is not None and (not (args.check_station or args.run) or args.station_review_dir is None):
         parser.error('--approach-target needs --check-station or --run and a new --station-review-dir')
+    if args.max_total_steps < 1:
+        parser.error('--max-total-steps must be positive')
     if args.attempt < 1:
         parser.error('--attempt must be a positive integer')
     if not np.isfinite(args.model_timeout) or args.model_timeout <= 0 or args.model_attempts < 1:
         parser.error('model timeout and attempts must be positive')
-    spec = task_configuration(args.task)
-    prompt_path = spec['prompt']
-    if args.resume:
-        try:
-            validate_resume_task(args.resume, args.task)
-        except ValueError as exc:
-            parser.error(str(exc))
-    resume_state = load_resume(args.resume) if args.resume else None
+    spec = task_configuration(args.task, active_perception=args.active_perception, mask_left_view=mask_left,
+                              observer_trial=observer_trial)
+    prompt_path = args.resume / 'prompt.txt' if staged_observer and args.resume else spec['prompt']
+    try:
+        resume_state = load_resume(args.resume, recover_interrupted_motion=args.recover_interrupted_motion,
+            max_total_steps=args.max_total_steps, recover_tracking_stop=args.recover_tracking_stop,
+            recover_rejected_motion=args.recover_rejected_motion,
+            recover_separation_stop=args.recover_separation_stop) if args.resume else None
+    except (ValueError, KeyError, IndexError, OSError) as exc:
+        parser.error(f'cannot recover saved run: {exc}')
     output = spec['output_root'] / f"{spec['output_prefix']}{args.attempt:03d}"
     if args.resume:
         output = args.resume.resolve() / ('resume-' + time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8])
+    if resume_state and (resume_state.get('control_mode', 'right_only') == 'active_perception') != args.active_perception:
+        parser.error('resume control mode mismatch; right-only and observer histories cannot be mixed')
+    if resume_state and args.task == 'plug-socket' and resume_state.get('mask_left_view') != mask_left:
+        parser.error('resume camera mask condition mismatch')
+    if resume_state and args.active_perception:
+        try:
+            validate_observer_guard(resume_state, separation.describe())
+        except ValueError as exc:
+            parser.error(str(exc))
     profile, configs, channels = configuration()
-    print(json.dumps(dict(mode='offline_preflight', model='gpt-6-astra', url=URL,
+    model, reasoning_effort = experiment_model(args.resume)
+    print(json.dumps(dict(mode='offline_preflight', model=model, reasoning_effort=reasoning_effort, url=URL,
         episodes=1, max_llm_calls=MAX_CALLS, max_retries=args.model_attempts,
         model_timeout_s=args.model_timeout, resume_source=str(args.resume) if args.resume else None,
         recovered_calls=resume_state['calls_used'] if resume_state else 0, max_seconds=MAX_SECONDS,
+        motion_recovery=resume_state.get('motion_recovery') if resume_state else None,
+        active_perception=args.active_perception, mask_left_view=mask_left, control_dimensions=13 if args.active_perception else 7,
+        **observer_metadata,
+        separation_guard=separation.describe() if separation else None,
         effective_cap_rad=MAX_MOVE_RAD, attended_verified_path_cap_rad=APPROACH_MOVE_RAD,
         max_gripper_delta=MAX_GRIPPER_DELTA,
         task_id=spec['id'], instruction=spec['instruction'],
         prompt_path=str(prompt_path), prompt_sha256=hashlib.sha256(prompt_path.read_bytes()).hexdigest(),
-        max_steps=MAX_STEPS, output=str(output),
+        max_steps=args.max_total_steps, remaining_steps=args.max_total_steps - (resume_state or {}).get('step', 0), output=str(output),
         calibration_required=False, grasp_example_required=False,
         channels=channels, attempt_already_consumed=output.exists(),
         credential_present=bool(os.environ.get('RHOS_API_KEY'))), indent=2))
     if not args.check_station and not args.run:
         return
+    if args.run and args.active_perception and not separation.ready:
+        parser.error('observer motion excluded until verified base geometry or a reviewed joint envelope is configured')
     if args.run and output.exists():
         parser.error(f'attempt already consumed: {output}. Preserve its logs; '
                      'use --attempt with a new episode number to start a separate episode.')
@@ -915,8 +1351,22 @@ def main():
             raise RuntimeError('existing daemon must be in confirmed SAFE HOLD')
         preview = observer_module().PreviewClient()
         preview.bootstrap(1.)
-        arm = StationArm(robot, preview, status, task_id=args.task)
+        current = checked_vector(robot.get_joint_state(), (14,))
+        task_status = nominal_station_status(status, current,
+            command_reference=resume_state['target'][-7:] if resume_state else None)
+        if args.active_perception:
+            # Apply the same nominal-model constraints to the left arm as well.
+            task_status = nominal_station_status(task_status, current, side='left',
+                command_reference=np.r_[resume_state['target'][:6],current[6]] if resume_state else None)
+        arm = StationArm(robot, preview, task_status, task_id=args.task,
+            active_perception=args.active_perception, separation_guard=separation, mask_left_view=mask_left,
+            observer_trial=observer_trial)
         arm.reset(Scene(id='preflight', instruction='Observe only'))
+        if init_joints is not None:
+            points = arm.observer_init_waypoints(init_joints)
+            count = len(points) if not np.array_equal(points[-1], arm.last) else 0
+            print(json.dumps({f'trial{observer_trial}_observer_init_waypoints': count,
+                'left_gripper': arm.initial[6], 'requested_left_joints_rad': init_joints}))
         if resume_state:
             comparison = validate_pose(resume_state, robot.get_joint_state())
             print(json.dumps(dict(resume_pose_check=comparison)))
@@ -934,26 +1384,33 @@ def main():
         deadline = time.monotonic() + MAX_SECONDS
         (output / 'attempt.json').write_text(json.dumps(dict(
             started_time_ns=time.time_ns(), channels=channels,
+            model=model, reasoning_effort=reasoning_effort,
+            **observer_metadata,
+            active_perception=args.active_perception, mask_left_view=mask_left, separation_guard=separation.describe() if separation else None,
             task_id=spec['id'], instruction=spec['instruction'], replay_title=spec['title'],
             prompt_sha256=hashlib.sha256(prompt_path.read_bytes()).hexdigest(),
             runner_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-            max_llm_calls=MAX_CALLS, max_seconds=MAX_SECONDS, max_steps=MAX_STEPS,
+            max_llm_calls=MAX_CALLS, max_seconds=MAX_SECONDS, max_steps=args.max_total_steps,
             model_timeout_s=args.model_timeout, model_attempts=args.model_attempts,
             resume_source=resume_state['source'] if resume_state else None,
+            motion_recovery=resume_state.get('motion_recovery') if resume_state else None,
             calibration_required=False, grasp_example_required=False), indent=2))
         (output / 'prompt.txt').write_bytes(prompt_path.read_bytes())
         transport = GatewayTransport(deadline=deadline)
         if resume_state:
             transport.calls = resume_state['http_attempts']
         stack.callback(transport.close)
+        arm.max_total_steps = args.max_total_steps
         arm.deadline = deadline
         transport.check = arm.check_model_wait
         policy = make_policy(transport, arm.pre_check, station=arm, resume_state=resume_state,
-                             timeout_s=args.model_timeout, model_attempts=args.model_attempts, prompt_path=prompt_path)
+                             timeout_s=args.model_timeout, model_attempts=args.model_attempts, prompt_path=prompt_path,
+                             model=model, reasoning_effort=reasoning_effort)
         install_checkpoint(policy, arm, output, transport)
         if resume_state:
             atomic_json(output / 'resume-source.json', dict(source=resume_state['source'],
-                calls_used=resume_state['calls_used'], step=resume_state['step']))
+                calls_used=resume_state['calls_used'], step=resume_state['step'],
+                motion_recovery=resume_state.get('motion_recovery')))
         completed = False
         termination_reasons, termination_details = [], []
         session = None
@@ -968,10 +1425,12 @@ def main():
             with SupervisedMotionSession(safety, uuid.uuid4().hex,
                     operation='astra-yam3-one-episode') as session:
                 arm.session = session
+                arm.observer_init_joints = init_joints
                 log = execute(policy, arm, output, task_spec=spec)
                 if log.status != 'success':
                     raise RuntimeError('evaluation failed; preserved checkpoint may be resumed: ' +
-                                       str(log.to_dict().get('error')))
+                                       str([sample.get('error') for sample in log.to_dict().get('samples', []) if sample.get('error')]
+                                           or log.to_dict().get('error')))
                 for sample in log.to_dict()['samples']:
                     termination_reasons.extend(sample['termination_reasons'])
                     termination_details.extend(sample['termination_details'])

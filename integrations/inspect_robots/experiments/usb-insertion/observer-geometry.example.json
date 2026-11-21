@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "mode": "registered_fk",
+  "verified": false,
+  "provenance": "REPLACE with measured station base registration, units and date",
+  "left_base_to_station": null,
+  "right_base_to_station": null,
+  "minimum_separation_m": 0.14,
+  "margin_m": 0.02
+}

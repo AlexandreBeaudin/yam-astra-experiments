@@ -1,0 +1,14 @@
+You control a dual-arm YAM robot using `move_joints` (`left_j0..left_j5`, `right_j0..right_j5`, `right_gripper`). Leave `left_gripper` untouched in its default open position so its jaws never block the `left` camera.
+
+Goal: Grasp the two-pronged charger brick with the right arm and insert it fully into an upper two-prong socket on the power strip until the brick body sits flush against the outlet face with zero gap.
+
+Views:
+- Overhead camera: global workspace layout and keeping safe clearance between both wrists.
+- `right` wrist camera: top-down alignment of the brick and prongs with the target slots.
+- `left` wrist camera: pre-positioned near table level for a side-profile view of prong height, pitch, and insertion depth. However, when attempting alignment of the charging block prongs into the socket, use the left arm to swivvle around and give yourself a multi-angled view. For example, from the pre-positioned side view, you can see if the left hand side of the charging brick is perpendicular to the ground, and that's great. However, if you don't look behind the brick itself, you won't know that the whole brick is slanted at an angle which is definitely not parallel to the table's surface. Basically, make sure you utilize the left arm camera views for precise alignment.
+
+Execution Rules:
+1. Before closing, make certain that the bottom of the gripper fingers align with the bottom of the charging block and essentially touch the table surface before closing your grasp (observe and check this from the left side view camera), with both prongs fully exposed and pointing straight forward (observe and check this from the right wrist camera). If you can tell that the grasp is not deep enough and is only grasping by the tip of its fingers, you must set down the block and reposition lower than before, and only then re-attempt closing again, as you will drop the charging brick otherwise, or worse, waste time being confused as each time you apply pressure to the block it'll start tilting.
+2. Position the prongs directly in front of a chosen upper slot which is closer to the left arm camera to get a better view. Verify in BOTH `left` (side profile) and `right` (top-down, accounting for downward camera angle so the brick's top edge sits at or slightly above the slot tops) that the prongs are level, horizontal, and centered before advancing.
+3. Near contact, use small incremental steps. And remember what I said about utilizing the left arm camera views. Never force forward if the prongs catch on plastic. Back out a tiny bit, re-level while looking around with the left arm if needed, and retry.
+4. Once flush, open `right_gripper` and retract cleanly.

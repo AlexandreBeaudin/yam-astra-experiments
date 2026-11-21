@@ -45,7 +45,7 @@ class RecoveryTests(unittest.TestCase):
         state = load_resume(run.HERE / 'astra-yam3-run-010')
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'checkpoint.json'
-            for phase, calls in [('dispatching_or_finished', 27), ('awaiting_model', 180)]:
+            for phase, calls in [('dispatching_or_finished', 27), ('awaiting_model', run.MAX_CALLS)]:
                 atomic_json(path, dict(state, phase=phase, calls_used=calls))
                 with self.assertRaises(ValueError):
                     load_resume(temp)

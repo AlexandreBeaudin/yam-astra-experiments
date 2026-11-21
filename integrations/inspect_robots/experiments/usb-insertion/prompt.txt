@@ -1,17 +1,29 @@
 Task
-Use only YAM3's logical right arm to pick up the loose cable and fully seat its USB-A plug in any one of the four ports on the hub. Leave the plug seated with the gripper clear. Keep the left arm at its initial pose.
+Use only YAM3's logical right arm (`right_j0`..`right_j5`, `right_gripper`) to pick up the loose USB-A plug and fully seat its metal tip into any of the four top-facing hub ports. Release and withdraw clear. Keep the left arm at its initial pose.
 
-Controls and views
-- Use move_joints with absolute targets in radians for right_j0 through right_j5. For right_gripper, 1.0 is open and 0.0 is closed. The per-call limits are 0.80 rad per arm joint and 1.0 for the gripper.
-- Use main for the overall layout and clearance, and right for finger-pad depth, plug orientation, and port alignment. Check new images and measured joints after each move. Use observation_recheck if you need a fresh look without moving.
+Controls & Views
+- `move_joints` takes absolute targets in radians (`0.80 rad/joint` max delta; `1.0` max gripper delta).
+- Keep `right_gripper` in `0.0` (closed) to `0.90` (open). Never command `> 0.90` or `right_j3 < -1.65`.
+- Views: `main` (check if both black fingertips are at the same height above the mat, and check clearance) and `right` (XY centering and `j5` alignment).
 
-Right-arm kinematic priors
-- Positive j0 sweeps inward. Increasing j1 and j2 together generally extends reach. Increasing j1 relative to j2 lowers the fingertips.
-- Negative j3 pitches downward. Use j4 and j5 as needed to orient the plug. Check how wrist rotation changes both the plug pose and the camera view.
+YAM3 Right-Arm Geometry
+- `right_j0`: `+` sweeps inward/left; `-` sweeps outward/right.
+- `right_j1` + `right_j2`: Increasing both together extends reach forward. Keep `right_j1 > right_j2` (high elbow) so `right_j3` has room to point straight down without hitting `-1.65 rad`.
+- `right_j3`: More negative (`-`) pitches the fingertips downward toward the base; less negative (`+`) tilts them forward toward the hub.
+- `right_j4`: Keep at `0.0`.
+- `right_j5`: Rotates the jaws around the vertical axis to flank the plug's narrow sides (or align with a hub port).
 
 Execution
-- Check that the pads flank the plug housing at grasp depth. Choose a grasp that leaves the metal tip exposed and room to approach a port. Lift slightly to verify the plug moves with the jaws.
-- Choose your approach and port from the views. Align the tip and its keyed orientation before making small moves along the port's insertion axis. If the plug binds, the hub shifts, or joint readback suggests contact, stop advancing. If the path is clear and the guards permit it, back out, re-observe, and try a revised alignment, grasp, or port.
-- Release and withdraw clear once the plug appears seated. Check that it stays fully seated after release before calling done. Use give_up for a hardware fault or when you can identify no feasible next move. Honor the hardware guards throughout.
+1. **Deploy & Level Fingertips Above Plug (3–4 calls):**
+   - Open `right_gripper: 0.90`. Extend above the plug housing (`j1 > j2`, `j4 = 0.0`, `j3 ≈ -1.35`).
+   - Center the black housing between the open jaws in `right` view and rotate `j5` so the pads flank the housing's long sides with the metal tip exposed outside the pads.
+   - **Visual Level Check in `main`:** Look at the two black fingertips in `main`. If the front/right fingertip hangs lower than the back/left fingertip, pitch `right_j3` more negative (`-0.15` to `-0.25 rad`) until both fingertips sit at the exact same height parallel to the mat.
+2. **Snug-to-Table Grasp (2–3 calls):**
+   - Lower straight down (`+j1`, small `-j2`) until `main` shows both fingertips touching the mat OR `measured` lags `targets` by `> 0.015 rad`.
+   - **As soon as the fingertips touch the mat with the housing centered in `right`, STOP lowering and immediately close `right_gripper: 0.0` in the very next call—do NOT retreat before closing.**
+   - Lift `~6 cm` (`-j1`). If the plug lifts with the metal tip exposed, proceed to Step 3. If it missed, reopen to `0.90`, adjust XY, lower until snug on the mat again, and close.
+3. **Align Over Hub & Insert:**
+   - Move `~5 cm` above the hub. Verify in `main` that the metal tip points straight down (`90°` to the hub top) and align `j5` with a port slot in `right` view.
+   - Center over the chosen port and lower in small steps (`0.02–0.04 rad` on `j1`). Stop on hub shift, plug bind, or `> 0.015 rad` lag. Once seated, open `right_gripper: 0.90`, lift clear, verify it stays seated, and call `done`.
 
-In each move_joints note, briefly state what you see and what the next move is meant to accomplish.
+In `note`, write 1–2 short sentences: what you see and what the move does.

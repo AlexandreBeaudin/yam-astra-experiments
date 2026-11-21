@@ -1,4 +1,52 @@
-## Two continuous camera views
+## Two- and three-camera layouts
+
+The **Views** selector switches between **Main + right** (the original layout)
+and **Main + left + right**. Active-observer runs default to three; right-only
+runs and legacy recordings default to two. Archival left video alone does not
+enable the observer layout. The selector preserves playback time and speed.
+`?layout=two` or `?layout=three` can also select the initial view.
+
+All three continuous feeds select their most recent recorded sample at or before
+the playback time. The three decision thumbnails use exact observation hashes,
+including the left image actually delivered to Astra; they remain frozen until
+the next decision. Missing left footage stays explicitly empty. If left was
+masked for the model, a forced three-camera view labels its continuous footage
+as archival and its decision thumbnail as masked. It never substitutes the
+archival left feed for a model observation.
+
+MP4 export uses the same layout and clock:
+
+```bash
+# Run after trial 5 has finished. The current trial need not be restarted.
+RUN_DIR=integrations/inspect_robots/experiments/plug-socket/runs/run-005
+YAM/gello_software/.venv/bin/python integrations/inspect_robots/export_replay_mp4.py \
+  --run-dir "$RUN_DIR" --layout three --speed 16 --fps 30
+
+# Preserve the original two-camera option, even for an observer recording.
+YAM/gello_software/.venv/bin/python integrations/inspect_robots/export_replay_mp4.py \
+  --run-dir "$RUN_DIR" --layout two --speed 16 --fps 30
+```
+
+Explicit layouts produce `replay_16x_three-camera.mp4` and
+`replay_16x_two-camera.mp4`, so both can coexist. `--layout auto` is the default
+and retains the historical `replay_16x.mp4` filename. An explicit layout also
+sets the initial HTML layout; the selector still offers both. `--html-only`
+rebuilds the viewer without encoding a video. Layout selection also works with
+`--combine-resumes`; left images and decision state clear at segment boundaries.
+
+Video defaults are 1600x1080 for two cameras and 1920x1440 for three. With no
+explicit `--height`, the exporter increases height if needed to fit the longest
+recorded tool card without cropping. The actual dimensions and selected camera
+views are recorded in the adjacent JSON. Explicit dimensions must fit the
+content; failures leave an existing MP4 intact.
+
+The current runner already records left video. It reads the HTML template and
+imports timeline preparation during post-run export, so an in-progress observer
+run can use the new viewer when it finishes. Active mode is recognized from its
+manifest or existing observer/13-joint decision events. No replay rebuild or
+MP4 rendering is needed inside an active trial's directory while it is running.
+
+## Original two-camera layout
 
 The replay now presents main and right-wrist recordings in equal large panels
 across the top, without cropping or picture-in-picture occlusion. At 1600×1080
@@ -10,8 +58,8 @@ remain separate and update only at decision boundaries. Missing continuous wrist
 recordings show an explicit empty state rather than substituting model snapshots.
 
 Regenerate an existing replay with export_replay_mp4.py --run-dir RUN --html-only.
-Future HTML and MP4 exports use this layout; existing MP4 files keep their previous
-layout until re-exported. No robot connection is required to rebuild replays.
+The layout remains selectable; existing MP4 files keep their previous layout
+until explicitly re-exported. No robot connection is required to rebuild replays.
 
 # YAM3 episode replay and video export
 
@@ -27,11 +75,12 @@ YAM/gello_software/.venv/bin/python integrations/inspect_robots/export_replay_mp
   --speed 4 --fps 30
 ```
 
-Default output: `<run-dir>/replay_4x.mp4` (1600×1080, H.264, yuv420p, CRF 18).
-The adjacent JSON records rendering settings and browser version. Use `--out`,
+Default output: `<run-dir>/replay_4x.mp4` (automatic camera layout, H.264,
+yuv420p, CRF 18; dimensions described above).
+The adjacent JSON records rendering settings and browser version. Use `--layout`, `--out`,
 `--title`, `--harness-label`, `--width`, `--height`, or `--browser-path` to override.
 Use `--html-only` to generate just the interactive viewer. Open `replay.html`
-directly or serve the run directory. Play/pause, 1×/2×/4×, the slider and clickable
+directly or serve the run directory. Play/pause, 1×/2×/4×/8×/16×/32×, the slider and clickable
 swimlanes all share the same clock. The timeline supports arrow keys, Home and End.
 `?export=1` removes controls and evidence disclosure from the publication layout.
 
@@ -123,3 +172,51 @@ ffprobe -v error -show_entries stream=codec_name,width,height,pix_fmt,r_frame_ra
 
 The viewer presents 640×480 source camera images without inventing higher-resolution
 camera detail; text and UI are rendered at the video canvas resolution.
+
+## Playback and MP4 speeds
+
+Select 1×, 2×, 4×, 8×, 16× or 32× in the viewer. Changing playback speed does
+not modify the evidence. Regenerate an existing viewer with `--html-only` to get
+the updated controls. Each resumed segment has its own replay; the initial run's
+HTML does not automatically include later segments.
+
+MP4 export accepts **any positive multiplier**, including decimals:
+
+```bash
+# Set RUN_DIR to the exact segment to export.
+YAM/gello_software/.venv/bin/python integrations/inspect_robots/export_replay_mp4.py \
+  --run-dir "$RUN_DIR" --speed 32 --fps 30
+# Or use --speed 8, --speed 16, --speed 2.5, etc.
+```
+
+Output is `$RUN_DIR/replay_32x.mp4` for 32×, plus a settings JSON. An existing
+export at that same filename is replaced only after encoding succeeds. Use
+`--out /path/to/custom-name.mp4` to choose another destination. Encoding is
+entirely offline, includes the camera/tool timeline layout, and has no audio.
+A 32-minute segment becomes roughly a one-minute video at 32×.
+
+## One viewer and MP4 for a resumed experiment
+
+Start from the original run directory, not the final resume segment:
+
+```bash
+YAM/gello_software/.venv/bin/python integrations/inspect_robots/export_replay_mp4.py \
+  --run-dir integrations/inspect_robots/experiments/usb-insertion/runs/run-001 \
+  --combine-resumes --speed 32 --fps 30
+```
+
+Outputs: `<run-dir>/combined/replay.html`, `replay_32x.mp4`, its settings JSON,
+and `segments.json`. Add `--html-only` to generate only the combined viewer, or
+change `--speed` for another positive multiplier. The standalone combiner is
+`python integrations/inspect_robots/combine_replays.py --run-dir ORIGINAL_RUN`.
+
+The combiner follows a single nested resume lineage, validates parent provenance,
+and refuses unfinished or branching lineages rather than silently mixing trials.
+It concatenates recorded segment durations, omitting unrecorded downtime between
+resumes. Time within every segment, decision images, tool envelopes and original
+evidence timestamps are preserved. Boundary labels appear in the viewer and video.
+Old camera/tool/decision state clears at each boundary until new samples arrive.
+Individual segment evidence is retained. The HTML references images in the source
+segment folders, so keep the full run folder together when copying it; the MP4 is
+standalone. Combined output is written separately and never replaces the original
+segment's replay or evidence.

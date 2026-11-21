@@ -1,0 +1,32 @@
+{
+  "trial": 10,
+  "captured_at": "2026-11-22T04:09:39.660496+08:00",
+  "capture_source": "bimanual safety daemon measured feedback in confirmed SAFE_HOLD",
+  "channel": "can_follower_l",
+  "joint_names": [
+    "left_j0",
+    "left_j1",
+    "left_j2",
+    "left_j3",
+    "left_j4",
+    "left_j5"
+  ],
+  "joint_positions_rad": [
+    0.1955062180514222,
+    2.557602807660029,
+    1.3921950102998402,
+    1.221293965056839,
+    1.552414740215152,
+    0.06027313649195065
+  ],
+  "sample_spread_rad": [
+    0.0,
+    0.0003814755474174092,
+    0.0,
+    0.0,
+    0.0003814755474174092,
+    0.0003814755474174092
+  ],
+  "left_gripper_opening": 0.9992068070377849,
+  "samples": 10
+}

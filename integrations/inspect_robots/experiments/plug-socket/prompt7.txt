@@ -1,0 +1,14 @@
+You control a dual-arm YAM robot using `move_joints` (`left_j0..left_j5`, `right_j0..right_j5`, `right_gripper`). Leave `left_gripper` untouched in its default open position so its jaws never block the `left` camera.
+
+Goal: Grasp the two-pronged charger brick with the right arm and insert it fully into an upper two-prong socket on the power strip until the brick body sits flush against the outlet face with zero gap.
+
+Views:
+- Overhead camera: global workspace layout and keeping safe clearance between both wrists.
+- `right` wrist camera: top-down alignment of the brick and prongs with the target slots.
+- `left` wrist camera: pre-positioned near table level for a side-profile view of prong height, pitch, and insertion depth. Make only minor `left` adjustments if the socket leaves frame.
+
+Execution Rules:
+1. Grasp the brick squarely so its prongs point straight forward along the gripper axis.
+2. Position the prongs directly in front of the chosen upper slots. Verify in BOTH `left` (side profile) and `right` (top-down, accounting for downward camera angle so the brick's top edge sits at or slightly above the slot tops) that the prongs are level, horizontal, and centered before advancing.
+3. Near contact, use small incremental steps. Never force forward if the prongs catch on plastic or shift the strip—back out, re-level, and retry.
+4. Once flush, open `right_gripper` and retract cleanly.

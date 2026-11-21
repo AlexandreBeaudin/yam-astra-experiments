@@ -1,0 +1,43 @@
+Task
+Use YAM3's right arm to grasp the charger brick and horizontally seat both flat prongs in any valid parallel 2-prong pair on the white strip. Release and withdraw clear. Use the left arm only as an observer camera boom.
+Mechanical insertion setup: the power strip is unplugged and upright, with its vertical socket face facing the robot arms.
+
+Controls & Materials
+- move_joints exposes left_j0..left_j5 plus right_j0..right_j5,right_gripper: 13 dimensions. left_gripper is untouched and locked at its starting opening.
+- Absolute radians; max change 0.80 rad/joint and 1.0 gripper per call. Both arms obey bounds, interpolation and the 0.08-rad tracking guard.
+- right_gripper stays in 0.0 closed to 0.90 open. NEVER command >0.90 or right_j3 < -1.65. Keep right_j4 within [-0.85, 0.85] rad and right_j1 > right_j2.
+- The compact square-faced brick has broad white top/bottom faces, a dark gray/black perimeter rim and two parallel flat metal prongs about 1.7 cm long from one edge.
+- Pinch the REAR HALF of the dark rim, leaving the front half and BOTH prongs cleanly beyond the black pads; this addresses Trial 8's short stick-out bottleneck.
+- The upright white strip has four stations in a row, each with upper and middle vertical parallel 2-prong pairs above angled 3-prong slots.
+- Choose any of the EIGHT parallel 2-prong vertical slot pairs; avoid all angled 3-prong slots.
+
+Views & Geometry
+- main: global clearance and lateral centering. right: prong/slot alignment when visible. left: actively movable camera for close views of the prongs, slots and brick-to-strip gap.
+- Deploy both arms clear of the base/rail before wrist pitch changes. Level the right black fingertips parallel to the mat in main using j3; no rigid radian formula.
+- Right j0 positive sweeps inward/left; negative outward/right. Increasing right j1+j2 extends reach. High elbow leaves room for pitch without the -1.65 stop.
+- Keep the prongs pointing horizontally into the socket face, with both flat blades vertical to match the slots. Use right_j4 to square the charger face parallel to the socket face; verify perpendicular entry in left/main.
+- If the pads obscure the slots in right, preserve the insertion posture and use left/main to inspect alignment.
+- right_j5 rotates about the gripper axis, not always table vertical. Use an observed roll (about 1.57 rad/90 degrees if needed) to match both flat prongs to the chosen slots, and recheck prong perpendicularity.
+
+Execution
+1. Fast Snug-to-Table Grasp
+- Open right_gripper=0.90; deploy over the rear rim, visually level fingertips in main and center the rear half between the pads in right, leaving both prongs exposed.
+- Lower with +right_j1 and small -right_j2 until fingertips reach mat level OR measured arm lag exceeds 0.015 rad.
+- Stop lowering; close right_gripper=0.0 in the NEXT call without retreating first. Hardware stops remain authoritative.
+- Lift about 7 cm with an observed retreat (-right_j1); verify attachment and clean prong stick-out. Joint increments are not centimetres.
+2. Explore Observer Views & Horizontal Alignment
+- Use left_j0..left_j5 throughout the task to explore different angles and move closer where clearance permits, including face-on and perpendicular side views. Choose viewpoints that resolve the current uncertainty; reposition when features are obscured or alignment stops improving.
+- To check prong-to-slot height, consider a low left-camera view near slot height, looking parallel to the tabletop, while keeping the arm clear of the surface.
+- Obey the registered >=0.16 m wrist/gripper separation guard and keep the left arm out of the insertion corridor; the guard does not cover every link, camera or cable.
+- Select one of the 8 parallel 2-prong slot pairs. Center both tips at slot height, pointing horizontally and perpendicular to the socket face; roll right_j5 to match the vertical slots.
+3. Dual-View Insertion & Release
+- Preserve the verified right-arm insertion angle while moving the left camera as needed to inspect both prong tips, the chosen slots and insertion depth.
+- Advance horizontally into the socket face in small observed 0.02–0.04 rad j1/j2 steps, coordinating other joints to hold height and angle. Use left for entry angle and gap, main for lateral clearance.
+- Stop on strip shift, binding or >0.015 rad arm lag; assess a clear guarded back-out before retrying. Never force a stop or bypass separation checks.
+- Once seated, open right_gripper=0.90, withdraw straight back clear of the brick, verify seating in left/main, and call done. If no supported alignment remains, explain it in give_up.
+
+Attention & Notes
+- Every move_joints call MUST include attention with primary_view (main/left/right), fusion_mode (single_view/cross_view_parallel) and REQUIRED views.main,views.left,views.right.
+- Each view has visible and regions: 1–3 when visible, [] if occluded/out of frame/masked. The primary view must be visible; cross_view_parallel requires at least two visible views.
+- Each region has label, center_uv=[u,v], box_uv=[umin,vmin,umax,vmax], weight. Coordinates use full original images, origin top-left, all in [0,1]; ordered positive-area boxes contain their centers. Positive weights sum to 1 in each visible view.
+- Write 1–2 short sentences in note: what you see and what the move does. Attention reports evidence selection, not internal model saliency.

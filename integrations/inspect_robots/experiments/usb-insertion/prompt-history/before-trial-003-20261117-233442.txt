@@ -1,0 +1,32 @@
+Task
+Use only YAM3's logical right arm (`right_j0`..`right_j5`, `right_gripper`) to pick up the loose USB-A cable and fully seat its metal plug into any of the four top-facing ports on the hub. Leave the plug seated with the gripper open and clear. Keep the left arm at its initial pose.
+
+Controls & Camera Roles
+- Tool: `move_joints` with absolute targets in radians (`right_gripper`: `1.0` = open, `0.0` = closed; caps: `0.80 rad/joint`, `1.0` gripper).
+- Opening restriction for this station: command `right_gripper` only within `0.0`–`0.90`. Use `0.90` for opening; NEVER command `1.0` or any value above `0.90`. The normalized scale still defines `1.0` as the calibrated fully open endpoint, but that endpoint must not be requested.
+- `main` (angled 3rd-person view): Judge table height, plug-tip pitch angle relative to the vertical table normal, and clearance.
+- `right` (wrist view): Judge XY centering, finger-pad depth around the plug housing, and keyed slot rotation (`j5`).
+
+YAM3 Right-Arm Kinematic Rules (Use This to Track Orientation)
+- `right_j0` (Base yaw): `+` sweeps inward/left; `-` sweeps outward/right.
+- Vertical Pitch Chain (`j1`, `j2`, `j3`): The gripper's angle relative to vertical depends on the combined pitch of shoulder (`j1`), elbow (`j2`), and wrist (`j3`):
+  * Increasing `j1` and `j2` together extends reach; increasing `j1` more than `j2` lowers the wrist.
+  * Negative `j3` pitches the gripper downward, with a hard stop near `-1.69 rad` (NEVER command `j3 < -1.65`).
+  * **High-Elbow Rule for Vertical Tip:** To point the gripper and USB tip straight down (`90°` to the table) without hitting `j3`'s `-1.65 rad` limit, keep a **high-elbow posture (`j1 > j2`, e.g., `j1 - j2 ≈ +0.30` to `+0.50 rad`)** so `j3` stays around `-1.10` to `-1.40 rad`. If `j2 > j1`, `j3` will hit its limit before the tip becomes vertical.
+- `right_j4` (Wrist tilt): **Keep `right_j4 ≈ 0.0` throughout the episode.** Tilting `j4` skews the wrist camera out of the vertical plane and breaks pitch tracking.
+- `right_j5` (Flange roll): Rotates the jaws and keyed USB-A orientation around the vertical approach axis.
+
+Execution Policy
+1. **Fast Vertical Grasp (Target < 8 Calls):**
+   - Approach the plug housing with `j4 ≈ 0`, `j1 > j2`, and `j3 ≈ -1.15` so the jaws point straight down at the cloth. Rotate `j5` so the parallel pads flank the two flat sides of the black plastic housing, leaving the entire metal USB-A tip exposed below/ahead of the pads.
+   - Open `right_gripper` to `0.90` before descending; do not request the fully open endpoint. Do NOT close until `main` shows the fingertips at cloth level flanking the housing sides.
+   - Close `right_gripper: 0.0` in one call and lift `~6 cm` (`-j1`). Accept the grasp ONLY if the plug lifts off the cloth AND the metal tip remains clearly visible and pointing downward.
+2. **Pre-Insertion Orientation Verification (Above Hub):**
+   - Move above the hub (`~5–8 cm` clearance in `main`). Before descending toward a port, verify in `main` that the metal tip points straight down (`perpendicular` to the hub top face). If the tip angles forward/backward, adjust `j1 - j2` (raising elbow / lowering shoulder) and `j3` (`≥ -1.65`) while keeping `j4 ≈ 0`.
+   - Use `j5` only to match the rectangular USB-A cross-section to the chosen port slot in `right` view.
+3. **Hypothesis-Driven Probes & Strategy Switch:**
+   - Before each alignment move near the hub, state in `note`: (a) what single geometric offset you are fixing, and (b) the expected visual change.
+   - If 5 consecutive orientation probes do not improve tip-to-port alignment, stop probing in mid-air: set the cable down on clear cloth, re-grasp cleanly with the tip pointing straight down, and retry. The exception is that if you believe that you can allign it properly with a few more tries, then go ahead and try.
+4. **Guarded Insertion & Release:**
+   - Once the tip is vertical and centered directly over the port opening, advance downward in small steps (`0.02–0.05 rad` on `j1`) along the vertical insertion axis.
+   - Stop immediately if the hub shifts, the plug bends/binds, or `measured` lags `targets` by `> 0.015 rad`. Once seated, open `right_gripper: 0.90`, retract upward, verify the plug stays seated, and call `done`.

@@ -1,0 +1,28 @@
+Task
+Use the bimanual setup to insert the loose USB-A plug into any of the four top-facing ports on the hub:
+- Right arm (`right_j0`..`right_j5`, `right_gripper`): Manipulation arm that grasps the plug and inserts it.
+- Left arm (`left_j0`..`left_j5`): Auxiliary observer camera arm (`left` view) that moves to an oblique side-angle vantage point for depth and plug-angle observations. Keep `left_gripper` untouched at its initial opening; it is not an exposed control dimension.
+
+Controls & Three Camera Roles
+- Tool: `move_joints` with absolute targets in radians for `right_j0`..`right_j5`, `left_j0`..`left_j5`, and `right_gripper` (`0.0` = closed). Per-call limits: `0.80 rad/joint`, `1.0` normalized gripper change, with existing interpolation, joint bounds and tracking guards on both arms.
+- Command `right_gripper` only within `0.0`–`0.90`; use `0.90` to open for grasping or release. NEVER request `1.0` or any opening above `0.90`. An initially wider opening may be held or reduced, never increased.
+- `main` (overhead third-person view): Global workspace layout and inter-arm clearance.
+- `right` (right-wrist view): XY centering over the plug/port, pad/housing placement, and keyed rectangular rotation.
+- `left` (left-wrist active observer view): An oblique side-profile view for judging fingertips-to-cloth depth, tip-to-socket gap and whether the USB tip is perpendicular to the hub surface. A side image is not calibrated metric depth; preserve uncertainty when geometry remains hidden.
+- Respect the active separation guard reported by the runner. Camera images are not a replacement for it. If observer motion is excluded because base registration/envelopes are missing, do not attempt to bypass that restriction.
+
+Kinematic Priors (Candidates to Verify Visually)
+- Right `j0`: positive generally sweeps inward/left and negative outward/right; verify the effect in the current posture.
+- Increasing right `j1` and `j2` together can extend reach; increasing `j1` relative to `j2` can lower the wrist. Negative `right_j3` is a downward-pitch candidate. NEVER command `right_j3 < -1.65`.
+- High-elbow starting candidate: `right_j1 - right_j2` around `+0.30` to `+0.50 rad`, `right_j3` around `-1.10` to `-1.40 rad`, and `right_j4` near `0.0`. Verify finger/plug orientation in `left` and `main`; those joint values do not guarantee a vertical tip.
+- Right `j5` rotates the jaws and keyed orientation; roll alone does not establish insertion-axis direction.
+- Left observer candidate: a bounded inward yaw/reach adjustment and left `j3` around `-0.70` to `-1.10` may aim the camera diagonally across the workspace. Use only the configured permitted envelope; neither a prior nor a model note establishes clearance.
+- Seek a visible 15–20 cm observer stand-off when it can be established, while obeying the guard and remaining clear of the right arm, hub, table, cables and people. The numeric guard covers wrist/gripper model points or a reviewed joint envelope; it does not certify whole-arm clearance.
+
+Execution Policy
+1. Position the left observer for grasp depth while approaching with the right arm. Simultaneous arm targets are allowed only when the entire proposed path passes both-arm checks. Keep the left gripper unchanged. Use `right` for XY/pad alignment and `left` plus `main` to assess both pads at housing contact depth before closing the right gripper to `0.0`.
+2. Make a small, observed lift; do not infer a calibrated centimetre displacement from a joint increment. Accept the grasp only if the plug lifts with the fingers, the metal tip stays exposed, and the independent views support a feasible insertion orientation.
+3. Before port approach, reposition the left camera for a side profile of the hub top and held tip, clear of the right manipulation corridor. Separately verify insertion-axis direction, keyed rotation and lateral alignment. Use `right_j5` for keyed rotation, not as a substitute for correcting axis tilt.
+4. Once orientation and centering are established, insert with small observed steps (candidate right `j1` changes `0.02–0.05 rad`, only when the actual motion follows the insertion axis). Cross-check right XY alignment and left side-profile depth after each move. Stop advancing if the hub shifts, the plug binds, or measured arm-joint lag exceeds `0.015 rad`. The runner's `0.08 rad` lag guard remains authoritative for both arms; a smaller lag does not prove clearance.
+5. Once `left` and `main` support seating, open the right gripper to `0.90`, withdraw clear, verify the plug stays seated, and call `done`.
+6. Before each diagnostic move, state in `note` the geometric uncertainty, predicted visible effect and how the left/right views will test it. Compare the result afterward. If three probes fail to resolve the same question, change the observer viewpoint or, with observed clearance, set down and regrasp. If no supported alternative remains, use `give_up`; never bypass an inter-arm, bounds or tracking rejection.
